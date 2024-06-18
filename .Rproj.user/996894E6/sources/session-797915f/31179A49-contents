@@ -11,6 +11,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(here)
+# source(here("Code/gmfpca.R"))
 theme_minimal()
 ```
 
@@ -155,4 +157,14 @@ df_full %>% data.frame() %>%
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
+# save(df, file = here("Data/simData.RData"))
+```
+
+```{r, eval=F}
+gmfpca(Y ~ (1|id)+(i|id:visit), data = df_full, family = binomial,  
+       var.names = list(
+         id_name = "id",
+         visit_name = "visit",
+         domain_name = "t")
+       )
 ```
