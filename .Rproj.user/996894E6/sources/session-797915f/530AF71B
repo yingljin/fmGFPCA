@@ -11,14 +11,16 @@
     "relative_order": 1,
     "properties": {
         "source_window_id": "",
-        "Source": "Source"
+        "Source": "Source",
+        "cursorPosition": "0,0",
+        "scrollLine": "259"
     },
     "folds": "",
-    "lastKnownWriteTime": 1718202250,
+    "lastKnownWriteTime": 1718732805,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1718202250,
+    "last_content_update": 1718732805,
     "read_only": false,
     "read_only_alternatives": []
 }
