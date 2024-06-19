@@ -1,8 +1,0 @@
-[1,"Installing 'instantiate' ...\n"]
-[2,"trying URL 'https://cran.rstudio.com/bin/macosx/big-sur-arm64/contrib/4.3/instantiate_0.2.2.tgz'\n"]
-[2,"Content type 'application/x-gzip' length 66883 bytes (65 KB)\n=========="]
-[2,"======================"]
-[2,"==================\ndownloaded 65 KB\n\n"]
-[1,"The downloaded binary packages are in\n"]
-[1,"\t/var/folders/rk/622njcb514j_ncjt15n3m3p00000gp/T//RtmpCl20TG/downloaded_packages\n"]
-[2,"\n\n✔ Package 'instantiate' successfully installed.\n"]
