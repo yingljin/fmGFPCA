@@ -17,7 +17,7 @@ data {
   int<lower=0> K; //number of observations along the entire track
   
   int<lower=0> Ju; //number of visits for subject u
-  int<lower=0> Ku; //number of observations per visit
+  int<lower=0> Ku[Ju]; //number of observations per visit
   int<lower=0> Nobs; // number of total observations for subject u
   array[Nobs] int<lower=0,upper=1> Y; //observed binary outcome
   
@@ -39,14 +39,15 @@ parameters {
   matrix[M, J] zeta; //level 2 random slopes
 }
 
+
 // The model 
 model {
+  //int kuj; //number of observations at a specific visi
   vector[Nobs] eta; // linear predictors
+  //matrix[kuj, 1] eta_l1;
+  //matrix[kuj, 1] eta_l2;
   int pre_nobs; //number of observations up until now
-  //int k_uj; //number of observations at a specific visit
-  //matrix[Ku, L] this_phi;
-  //matrix[Ku, M] this_psi;
-  
+
   // prior
   to_vector(xi) ~ normal(0, lambda);
   for(j in 1:J){
@@ -54,14 +55,14 @@ model {
   }
   
   // update linear predictor
-  pre_nobs = 1;
+  pre_nobs = 0;
   for(j in 1:Ju){
-    //k_uj = Ku[j]; //number of observation in this visit
-    //print(k_uj);
-    //this_phi = efuncs_l1[1:Ku, ];
-    //this_psi = efuncs_l2[1:Ku, ];
-    eta[(Ku*(j-1)+1):Ku*j] = b0[1:Ku] + to_vector(efuncs_l1[1:Ku, ] * xi + efuncs_l2[1:Ku, ] * to_matrix(zeta[, j]));
-    pre_nobs = pre_nobs+Ku;
+    //number of observation in this visit is Ku[j]
+    //kuj = Ku[j];
+    //eta_l1 = efuncs_l1[1:Ku[j], ] * xi;
+    //eta_l2 = efuncs_l2[1:Ku[j], ] * to_matrix(zeta[, j]);
+    eta[(pre_nobs+1):(pre_nobs+Ku[j])] = b0[1:Ku[j]] + to_vector(efuncs_l1[1:Ku[j], ] * xi) + to_vector(efuncs_l2[1:Ku[j], ] * to_matrix(zeta[, j]));
+    pre_nobs = pre_nobs+Ku[j];
     //eta = 0.5;
   }
   
