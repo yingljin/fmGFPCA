@@ -10,12 +10,10 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-set.seed(618)
+set.seed(625)
 
 library(tidyverse)
 library(here)
-# source(here("Code/gmfpca.R"))
-theme_minimal()
 ```
 
 # Simulation set-up
@@ -46,7 +44,7 @@ $$\phi_l(t) = \{\sqrt{2}sin(2\pi t), \sqrt2 cos(2\pi t), \sqrt2 sin (4\pi t), \s
 
 $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3, 4$$
 
-```{r efuncs_l1}
+```{r efuncs_l1, fig.height=3, fig.width=12}
 # level 1 eigenfunctions:
 phi_mat <- matrix(NA, nrow = K, ncol = L)
 phi_mat[, 1] <- sqrt(2)*sin(2*pi*t_vec)
@@ -60,8 +58,9 @@ phi_mat %>% data.frame() %>%
   mutate(t=t_vec) %>%
   pivot_longer(starts_with("phi")) %>%
   ggplot()+
-  geom_line(aes(x=t, y=value, col=name))+
-  labs(x="t", y="", col = "PC")
+  geom_line(aes(x=t, y=value))+
+  facet_wrap(~name, nrow= 1)+
+  labs(x="t", y="")
 
 lambda <- 0.5^((1:L)-1)
 ```
@@ -75,7 +74,7 @@ lambda <- 0.5^((1:L)-1)
 $$\psi_l(t) = \{\sqrt{2}sin(6\pi t), \sqrt2 cos(6\pi t), \sqrt2 sin (8\pi t), \sqrt2 cos(8\pi t)\}$$
 
 $$\zeta_{ijm} \sim N(0, \gamma_{m}), \hspace{0.5cm} \gamma_m = 0.5^{m-1}, l=1,2, 3, 4$$
-```{r efuncs_l2}
+```{r efuncs_l2, fig.height=3, fig.width=12}
 # level 2 eigenfunctions:
 psi_mat <- matrix(NA, nrow = K, ncol = M)
 psi_mat[, 1] <- sqrt(2)*sin(6*pi*t_vec)
@@ -89,66 +88,65 @@ psi_mat %>% data.frame() %>%
   mutate(t=t_vec) %>%
   pivot_longer(starts_with("psi")) %>%
   ggplot()+
-  geom_line(aes(x=t, y=value, col=name))+
-  labs(x="t", y="", col = "PC")
+  geom_line(aes(x=t, y=value))+
+  facet_wrap(~name, nrow = 1)+
+  labs(x="t", y="")
 
 gamma <- 0.5^((1:M)-1)
 ```
 
-
-# Example of one subject
-
-```{r oneSubject}
-# level 1 score (subject)
-xi <- sapply(lambda, function(x){rnorm(1, mean=0, sd = sqrt(x))})
-# level 1 random effects
-# phi_mat%*%xi
-
-
-# level 2 score (subject-visit level)
-zeta <- sapply(gamma, function(x){rnorm(J, mean=0, sd = sqrt(x))})
-
-# latent function
-eta <- 0 + apply(psi_mat %*% t(zeta), 2, function(x){x+phi_mat %*% xi})
-```
-
-
-```{r, fig.height=3, fig.width=15}
-eta %>% data.frame() %>% 
-  mutate(t = t_vec) %>%
-  pivot_longer(starts_with("X"), names_to = "visit") %>% 
-  mutate(probs = plogis(value)) %>%
-  mutate(Y = rbernoulli(1, probs)) %>%
-  mutate(Y = as.numeric(Y)) %>%
-  ggplot()+
-  geom_line(aes(x=t, y=probs))+
-  geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_wrap(~visit, nrow = 1)
-
-```
-
-# A full datasets? 
+# Generate a full datasets
 
 ```{r FullData}
 NI<- 100 # sample size
 df_full <- expand.grid(id=1:NI, visit = 1:J, t=t_vec) %>% arrange(id, visit, t)
 df_full$eta <- NA
 
+# containers for score: 
+xi_full <- matrix(NA, nrow = NI, ncol = L)
+zeta_full <- array(NA, dim = c(J, M, NI))
+```
+
+
+```{r}
+# generate latent function
 for(i in 1:NI){
-  # level 1 score (subject)
-  xi <- sapply(lambda, function(x){rnorm(1, mean=0, sd = sqrt(x))})
-  # level 2 score (subject-visit level)
-  zeta <- sapply(gamma, function(x){rnorm(J, mean=0, sd = sqrt(x))})
+  # level 1 score (subject): L by 1
+  xi <- rnorm(L, 0, sqrt(lambda))
+  xi_full[i, ] <- xi
+  # level 2 score (subject-visit level): J by M
+  # zeta <- sapply(gamma, function(x){rnorm(J, mean=0, sd = sqrt(x))})
+  zeta <- rnorm(J*M, mean = 0, sd = rep(sqrt(gamma), J))
+  zeta <- matrix(zeta, nrow = J, ncol=M, byrow = T)
+  zeta_full[,,i] <- zeta
   # latent function
-  eta_i <- 0 + apply(psi_mat %*% t(zeta), 2, function(x){x+phi_mat %*% xi})
-  df_full[df_full$id==i, "eta"] <-  as.vector(eta_i)
+  ## subjectlevel
+  eta_l1 <- phi_mat %*% xi
+  eta_l1 <- rep(eta_l1, J)
+  ## subject-visit level 
+  eta_l2 <- psi_mat %*% t(zeta)
+  eta_l2 <- as.vector(eta_l2)
+  ## overall
+  eta_i <- 0 + eta_l1 + eta_l2
+  df_full[df_full$id==i, "eta"] <-  eta_i
   
 }
+```
 
-df_full <- df_full %>% mutate(probs = plogis(eta)) %>%
+
+```{r}
+# generate binary outcome
+# turns out I messed up "plogis" and "logistic"
+df_full <- df_full %>% mutate(probs = exp(eta)/(1+exp(eta))) %>%
   mutate(Y = rbernoulli(1, probs)) %>%
   mutate(Y = as.numeric(Y))
+```
 
+
+```{r}
+# check the generated scores
+apply(xi_full, 2, var)
+apply(zeta_full, MARGIN = c(1,2), var)
 ```
 
 ```{r, fig.height=12, fig.width=15}
@@ -159,6 +157,6 @@ df_full %>% data.frame() %>%
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
-save(df_full, file = here("Data/simData.RData"))
+# save(df_full, file = here("Data/simData.RData"))
 ```
 
