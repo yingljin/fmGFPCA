@@ -137,9 +137,11 @@ for(i in 1:NI){
 ```{r}
 # generate binary outcome
 # turns out I messed up "plogis" and "logistic"
-df_full <- df_full %>% mutate(probs = exp(eta)/(1+exp(eta))) %>%
-  mutate(Y = rbernoulli(1, probs)) %>%
-  mutate(Y = as.numeric(Y))
+df_full <- df_full %>% mutate(probs = exp(eta)/(1+exp(eta))) 
+df_full$Y <- rbinom(nrow(df_full), 1, df_full$probs)
+#%>%
+  # mutate(Y = rbernoulli(1, probs)) %>%
+  # mutate(Y = as.numeric(Y))
 ```
 
 
@@ -157,6 +159,6 @@ df_full %>% data.frame() %>%
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
-# save(df_full, file = here("Data/simData.RData"))
+save(df_full, file = here("Data/simData.RData"))
 ```
 
