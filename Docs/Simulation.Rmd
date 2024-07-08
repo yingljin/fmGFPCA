@@ -62,6 +62,7 @@ phi_mat %>% data.frame() %>%
   facet_wrap(~name, nrow= 1)+
   labs(x="t", y="")
 
+# level 1 eigenvalues
 lambda <- 0.5^((1:L)-1)
 ```
 
@@ -92,33 +93,34 @@ psi_mat %>% data.frame() %>%
   facet_wrap(~name, nrow = 1)+
   labs(x="t", y="")
 
+# level 2 eigenvalues
 gamma <- 0.5^((1:M)-1)
 ```
 
 # Generate a full datasets
 
 ```{r FullData}
-NI<- 100 # sample size
-df_full <- expand.grid(id=1:NI, visit = 1:J, t=t_vec) %>% arrange(id, visit, t)
+N <- 100 # sample size
+df_full <- expand.grid(id=1:N, visit = 1:J, t=t_vec) %>% arrange(id, visit, t)
 df_full$eta <- NA
 
 # containers for score: 
-xi_full <- matrix(NA, nrow = NI, ncol = L)
-zeta_full <- array(NA, dim = c(J, M, NI))
+xi_full <- matrix(NA, nrow = N, ncol = L) # subject by eigenfunction
+zeta_full <- array(NA, dim = c(N, J, M)) # subject by visit by eigenfunction
 ```
 
 
 ```{r}
 # generate latent function
-for(i in 1:NI){
+for(i in 1:N){
   # level 1 score (subject): L by 1
   xi <- rnorm(L, 0, sqrt(lambda))
   xi_full[i, ] <- xi
   # level 2 score (subject-visit level): J by M
   # zeta <- sapply(gamma, function(x){rnorm(J, mean=0, sd = sqrt(x))})
   zeta <- rnorm(J*M, mean = 0, sd = rep(sqrt(gamma), J))
-  zeta <- matrix(zeta, nrow = J, ncol=M, byrow = T)
-  zeta_full[,,i] <- zeta
+  zeta <- matrix(zeta, nrow = J, ncol=M, byrow = T) # visit by eigenfunction
+  zeta_full[i,,] <- zeta
   # latent function
   ## subjectlevel
   eta_l1 <- phi_mat %*% xi
@@ -129,7 +131,6 @@ for(i in 1:NI){
   ## overall
   eta_i <- 0 + eta_l1 + eta_l2
   df_full[df_full$id==i, "eta"] <-  eta_i
-  
 }
 ```
 
@@ -139,26 +140,22 @@ for(i in 1:NI){
 # turns out I messed up "plogis" and "logistic"
 df_full <- df_full %>% mutate(probs = exp(eta)/(1+exp(eta))) 
 df_full$Y <- rbinom(nrow(df_full), 1, df_full$probs)
-#%>%
-  # mutate(Y = rbernoulli(1, probs)) %>%
-  # mutate(Y = as.numeric(Y))
 ```
 
 
-```{r}
+```{r CheckScore}
 # check the generated scores
 apply(xi_full, 2, var)
-apply(zeta_full, MARGIN = c(1,2), var)
+apply(zeta_full, MARGIN = c(2,3), var)
 ```
 
-```{r, fig.height=12, fig.width=15}
-df_full %>% data.frame() %>% 
-  filter(id %in% 1:4) %>%
+```{r CheckData, fig.height=12, fig.width=15}
+df_full %>% filter(id %in% 1:4) %>%
   ggplot()+
   geom_line(aes(x=t, y=probs))+
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
-save(df_full, file = here("Data/simData.RData"))
+save(df_full, xi_full, zeta_full, file = here("Data/simData.RData"))
 ```
 
