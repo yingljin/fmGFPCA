@@ -2,3 +2,8 @@
 # 7/8/2024
 1. Simulate multi-level functional data
 2. Test a toy example of fmGFPCA, with complete tracks + partial last track
+
+# 7/9/2024
+1. Try the simulation with higher observation density/smaller bin
+2. Extract the error of score estiamtes
+- sample independent set for validation
