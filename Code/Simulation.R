@@ -11,7 +11,7 @@ library(here)
 
 #### Simulation set up ####
 
-N <- 100 # sample size 
+N <- 500 # sample size 
 J <- 5 # number of visit per subject
 K <- 500 # number of observations per visit
 t_vec <- seq(0, 1, length.out = K) # time grid
@@ -116,4 +116,4 @@ df_full %>% group_by(id, visit) %>% select(id, visit, Y) %>%
   summarise(freq = sum(Y))
 
 #### save data ####
-save(df_full, xi_true, zeta_true, file = here("Data/simData_K500.RData"))
+save(df_full, xi_true, zeta_true, file = here("Data/simData_N500_K500.RData"))
