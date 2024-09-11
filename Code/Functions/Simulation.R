@@ -76,31 +76,5 @@ gen_bi <- function(N, J, K, t_vec, L, M, lambda, gamma){
   
 }
 
-#### Test ####
-
-# df1 <- gen_bi(N = 20, J = 2, K = 100, t_vec = seq(0, 1, length.out = 100), 
-#               L = 4, M = 4, lambda = 0.5^((1:4)-1), gamma =  0.5^((1:4)-1))
-# 
-# df1$data
 
 
-
-# #### Check data ####
-# # scores
-# apply(df1$l1score, 2, var)
-# apply(df1$l2score, MARGIN = c(2,3), var)
-# 
-# # data
-# df1$data %>% filter(id %in% 1:4) %>% 
-#   ggplot()+
-#   geom_line(aes(x=t, y=probs))+
-#   geom_point(aes(x=t, y=Y), size = 0.5)+
-#   facet_grid(row = vars(id), col=vars(visit))
-# # Since the density of observation is much higher
-# # is very hard to see the change of activity with the flunctuations of eita
-# 
-# df_full %>% group_by(id, visit) %>% select(id, visit, Y) %>%
-#   summarise(freq = sum(Y))
-# 
-# #### save data ####
-# save(df_full, xi_true, zeta_true, file = here("Data/simData_N500_K500.RData"))

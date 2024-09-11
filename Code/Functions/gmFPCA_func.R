@@ -7,19 +7,25 @@ library(refund)
 library(fastGFPCA)
 
 # data: training data frame. must include colums id, t, visit, y
+#       id and visit need to be factor
+#       visit need to be integer value
 # bin_w: how many observations are included in each bin
 # K = number of visits per subject
 # L: number of l1, l2 eigenfunctions
 
 # Note: this functions can only deal with regularly measured data
+#       I plan to modify this to accomodate irregular data as well
 
-gm_FPCA <- function(data, bin_w=10, L){
+gm_FPCA <- function(data, bin_w=10, L=4){
   
   
   # other parameters
   t_vec <- unique(data$t) # measurement grid
-  J <- max(unique(data$visit)) # number of visits per subject
+  J <- max(as.numeric(unique(data$visit))) # number of visits per subject
   K <- length(t_vec) # number of observations per visit
+  
+  # add a function index
+  # data$ind <- rep(1:K, J)
   
   # Step 1
   print("Step 1: bin data")
@@ -106,11 +112,13 @@ gm_FPCA <- function(data, bin_w=10, L){
   #output
   # eigenvalues (scaled)
   evals <- 1/global_glmm$sp[-1]
+  evals1 <- evals[1:L]
+  evals2 <- evals[-c(1:L)]
   
   # population mean (scaled)
   mu <- predict(global_glmm, type = "terms")[1:K, 1]+coef(global_glmm)[1]
   
-  return(list(evals1 = evals[1:L], evals2 = evals[(L+1): length(evals)],
+  return(list(evals1 = evals1, evals2 = evals2,
               mu = mu, efuncs_l1 = reeval_efunc_l1,
               efuncs_l2 = reeval_efunc_l2))
   
