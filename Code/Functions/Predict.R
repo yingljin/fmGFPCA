@@ -21,7 +21,7 @@ library(rstan)
 
 mDynPred <- function(data, mu, 
                      evals1, evals2, 
-                     efuncs1, efuncs2, J=2, 
+                     efuncs1, efuncs2, J, 
                      qt_int = c(0.025, 0.975)){
   
   # Usefule scalars
@@ -47,7 +47,7 @@ mDynPred <- function(data, mu,
     fit <- stan(
       file = here("Code/prediction.stan"),  # Stan program
       data = pred_data,    # named list of data
-      chains = 4,             # number of Markov chains
+      chains = 2,             # number of Markov chains
       warmup = 1000,          # number of warmup iterations per chain
       iter = 2000,            # total number of iterations per chain
       cores = 1,              # number of cores (could use one per chain)
@@ -55,48 +55,46 @@ mDynPred <- function(data, mu,
     )
     
     # scores
-    sum_scores <- summary(fit)$summary
-    xi_pred <- sum_scores[1:L, "mean"]
-    zeta_pred <- sum_scores[-c(1:L, nrow(sum_scores)), "mean"]
+    sum_scores <- summary(fit)$summary[1:(L+M*J), "mean"]
+    xi_pred <- sum_scores[1:L]
+    zeta_pred <- sum_scores[-c(1:L)]
     zeta_pred <- matrix(zeta_pred, M, J, byrow = T) # M by J
     
     # linear predictors
     eta_l1 <- efuncs1 %*% xi_pred
     eta_l2 <- as.vector(efuncs2 %*% zeta_pred)
     eta_pred <- rep(mu, J)+rep(eta_l1, J)+eta_l2
-    eta_pred <- data.frame(visit = as.factor(rep(1:J, each = K)),
-                           eta_pred) 
+    df_eta_pred <- data.frame(visit = as.factor(rep(1:J, each = K)),
+                              tind = rep(1:K, J),
+                              eta_pred = eta_pred) 
     
     # interval
-    ## level 1
-    samp_scores <- as.matrix(fit)
-    eta_l1_samp <- efuncs1 %*% t(samp_scores[, 1:L]) # K by number of samples
+    samp_scores <- as.matrix(fit)[, 1:(L+M*J)]
     
-    ## level 2
-    eta_l2_sample <- array(NA, dim= c(nrow(samp_scores), K, J))
+    ## calculatel linear predictor for each sample
+    eta_samp <- matrix(NA, nrow = K*J, ncol = nrow(samp_scores)) # container: Nobs by Nsample
+    
     for(i in 1:nrow(samp_scores)){
-      this_zeta <-  matrix(samp_scores[i, -c(1:L, nrow(sum_scores))], 
-                           M, J, byrow = T)
-      eta_l2_sample[i,,] <- efuncs2 %*% this_zeta
+      xi_i <- samp_scores[i, 1:L]
+      zeta_i <- samp_scores[i, -c(1:L)]
+      zeta_i <- matrix(zeta_i, M, J, byrow = F) # M by J
+      
+      # linear predictors
+      eta_l1_i <- efuncs1 %*% xi_i
+      eta_l2_i <- as.vector(efuncs2 %*% zeta_i)
+      eta_pred_i <- rep(mu, J)+rep(eta_l1_i, J)+eta_l2_i
+      
+      eta_samp[,i] <- eta_pred_i
       
     }
     
-    ## whole
-    eta_sample <- array(NA, dim= c(nrow(samp_scores), K, J))
-    for(i in 1:nrow(samp_scores)){
-      eta_sample[i,,] <- eta_l2_sample[i,,]+matrix(rep(eta_l1_samp[,i], J), ncol = J)
-    }
-    
     ## quantile
-    eta_qt <- apply(eta_sample, 2:3, quantile, probs = qt_int) 
- 
-    ## clean
-    eta_pred$eta_pred_lb <- as.vector(eta_qt[1,,])
-    eta_pred$eta_pred_ub <- as.vector(eta_qt[2,,])
-                    
+    eta_qt <- apply(eta_samp, 1, quantile, probs = qt_int) 
+    df_eta_pred$eta_pred_lb <- eta_qt[1,]
+    df_eta_pred$eta_pred_ub <- eta_qt[2,]
     
     # output
-    return(list(score1 = xi_pred, score2 = zeta_pred, eta_pred = eta_pred))
+    return(list(score1 = xi_pred, score2 = zeta_pred, df_pred = df_eta_pred))
     
 }
 
