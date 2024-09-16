@@ -5,19 +5,21 @@ source(here("Code/Functions/gmFPCA_func.R"))
 source(here("Code/Functions/ReEvalEfuncs.R"))
 source(here("Code/Functions/Predict.R"))
 
-set.seed(911)
+set.seed(915)
 
 
-# toy simulatio scheme
-# N = 100, J = 2, K = 100
+# toy simulation scheme
+# N_train = 80,  N_test = 20, J = 2, K = 100
 # observations stops at the second visit
-# specific time is generated randomly
+# specific stopping time is generated randomly
 # bin every 10 observations
 # number of FPC = 4
 
 #### Simulation ####
 
-M <- 100
+M <- 10
+Ntr <- 40
+Nte <- 10
 
 # containers
 comp_time_vec <- rep(NA, M)
@@ -26,7 +28,7 @@ pred_list_allM <- list()
 for(m in 1:M){
   
   # generate training data
-  data_tr <- gen_bi(N = 100, J = 2, K = 100, 
+  data_tr <- gen_bi(N = Ntr, J = 2, K = 100, 
                     t_vec = seq(0, 1, length.out = 100),
                     L = 4, M = 4, 
                     lambda = 0.5^((1:4)-1), 
@@ -40,7 +42,7 @@ for(m in 1:M){
   
   # prediction
   ## generate test data
-  data_te <- gen_bi(N = 100, J = 2, K = 100, 
+  data_te <- gen_bi(N = Nte, J = 2, K = 100, 
                     t_vec = seq(0, 1, length.out = 100),
                     L = 4, M = 4, 
                     lambda = 0.5^((1:4)-1), 
@@ -50,7 +52,7 @@ for(m in 1:M){
   
   
   ## truncate observations
-  tmax_vec <- runif(100, 0, 1)
+  tmax_vec <- runif(Nte, 0, 1)
   
   ## predict subject by subject
   pred_list <- list()
@@ -65,7 +67,9 @@ for(m in 1:M){
                      evals2 = gmfpca_fit$evals2,
                      efuncs1 =  gmfpca_fit$efuncs_l1,
                      efuncs2 = gmfpca_fit$efuncs_l2,
-                     J = 2)
+                     J = 2, 
+                     warmup = 1000,
+                     iter = 2000)
     
     pred_list[[i]] <- data_te$data %>% filter(id == i) %>% 
       mutate(eta_pred = pred_data$df_pred$eta_pred,
@@ -73,20 +77,25 @@ for(m in 1:M){
              eta_pred_ub = pred_data$df_pred$eta_pred_ub) 
   
     ## remove observed part
-    pred_list[[i]][pred_list[[i]]$t<=tmax_vec[i], c("eta_pred", "eta_pred_lb", "eta_pred_ub")] <- NA
+    pred_list[[i]][pred_list[[i]]$t<=tmax_vec[i] | pred_list[[i]]$visit==1, 
+                   c("eta_pred", "eta_pred_lb", "eta_pred_ub")] <- NA
   }
   
   toc <- Sys.time()
   # computation time
-  comp_time_vec[m] <- difftime(toc, tic, units = "sec")
+  comp_time_vec[m] <- difftime(toc, tic, units = "mins")
   
-  pred_list_allM[m] <- bind_rows(pred_list)
+  pred_list_allM[[m]] <- bind_rows(pred_list)
   
   # print progress
   print(paste0(m, "/", M, " simulation completed"))
 }
 
 
+# There are numeric problems here:
+## Tail Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+## estimated Bayesian Fraction of Missing Information was low
+## chains have not mixed.
 
 #### Figures ####
 
@@ -97,56 +106,15 @@ data_tr$data %>% filter(id %in% 16:19) %>%
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
-#### GMFPCA ####
-gmfpca_fit <- gm_FPCA(data = df_train, bin_w=10, L = 4)
-
-
-gmfpca_fit$evals1
-gmfpca_fit$evals2
-plot(gmfpca_fit$mu)
-
-
-#### Prediction ####
-
-df_test <- gen_bi(N = 1, J = 3, K = 100, t_vec = seq(0, 1, length.out = 100),
-       L = 4, M = 4, lambda = 0.5^((1:4)-1), gamma =  0.5^((1:4)-1))
-
-# truncate
-df_test_tr <- df_test$data %>% filter(t <= 0.5)
-
-pred <- mDynPred(data = df_test_tr, 
-         mu = gmfpca_fit$mu,
-         evals1 = gmfpca_fit$evals1,
-         evals2 = gmfpca_fit$evals2,
-         efuncs1 =  gmfpca_fit$efuncs_l1,
-         efuncs2 = gmfpca_fit$efuncs_l2,
-         J = 3
-         )
-
-pred$score1
-df_test$l1score
-
-pred$score2
-df_test$l2score
-
-head(df_test_tr)
-head(pred$eta_pred)
-
-
-df_pred <- df_test$data %>% mutate(eta_pred = pred$df_pred$eta_pred,
-                                   eta_pred_lb = pred$df_pred$eta_pred_lb,
-                                   eta_pred_ub = pred$df_pred$eta_pred_ub)
-df_pred %>% #head()
+pred_list_allM[[2]] %>% #head()
+  filter(id %in% sample(1:20, 4)) %>% 
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>%
   ggplot()+
   geom_line(aes(x=t, y=eta, col = "True"))+
   geom_line(aes(x=t, y=eta_pred, col = "Pred"))+
   geom_line(aes(x=t, y=eta_pred_ub, col = "Pred"), linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_lb, col = "Pred"), linetype = "dashed")+
-  facet_wrap(~visit)
+  facet_grid(rows = vars(id), cols = vars(visit))
 
+pred_list_allM[[10]] %>% View()
 
-
-pred$eta_pred
-pred$score1
-pred$score2

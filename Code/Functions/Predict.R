@@ -11,6 +11,10 @@ library(rstan)
 # load("Data/data_N20_J2_K100.RData")
 # data <- data_N20J2K100$data
 
+# pre-compile
+pred_stan_mode <- instantiate::stan_package_model(
+  name = "Prediction", package = "fastGFPCA"
+)
 
 #### Out-of-sample prediction for one subject #### 
 
@@ -22,7 +26,7 @@ library(rstan)
 mDynPred <- function(data, mu, 
                      evals1, evals2, 
                      efuncs1, efuncs2, J, 
-                     qt_int = c(0.025, 0.975)){
+                     qt_int = c(0.025, 0.975),...){
   
   # Usefule scalars
   t_max <- max(data$t) # end of observation point
@@ -44,8 +48,10 @@ mDynPred <- function(data, mu,
                     gamma = evals2)
     
     # stan model
+    
     fit <- stan(
       file = here("Code/prediction.stan"),  # Stan program
+      fit = T, 
       data = pred_data,    # named list of data
       chains = 2,             # number of Markov chains
       warmup = 1000,          # number of warmup iterations per chain
