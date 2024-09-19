@@ -1,20 +1,17 @@
 # This script writes the function for out-of-sample prediction 
 # using outputs from function gm_FPCA
 
-library(tidyverse)
-library(lme4)
-library(mgcv)
-library(refund)
-library(here)
-library(rstan)
+# library(tidyverse)
+# library(lme4)
+# library(mgcv)
+# library(refund)
+# library(here)
+# library(rstan)
+# library(instantiate)
 
 # load("Data/data_N20_J2_K100.RData")
 # data <- data_N20J2K100$data
 
-# pre-compile
-pred_stan_mode <- instantiate::stan_package_model(
-  name = "Prediction", package = "fastGFPCA"
-)
 
 #### Out-of-sample prediction for one subject #### 
 
@@ -25,7 +22,7 @@ pred_stan_mode <- instantiate::stan_package_model(
 
 mDynPred <- function(data, mu, 
                      evals1, evals2, 
-                     efuncs1, efuncs2, J, 
+                     efuncs1, efuncs2, J,
                      qt_int = c(0.025, 0.975),...){
   
   # Usefule scalars

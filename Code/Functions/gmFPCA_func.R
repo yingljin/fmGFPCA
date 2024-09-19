@@ -1,10 +1,10 @@
 # writes function for the model fitting part of gmFPCA algorithm
 
-library(tidyverse)
-library(lme4)
-library(mgcv)
-library(refund)
-library(fastGFPCA)
+# library(tidyverse)
+# library(lme4)
+# library(mgcv)
+# library(refund)
+# library(fastGFPCA)
 
 # data: training data frame. must include colums id, t, visit, y
 #       id and visit need to be factor
@@ -58,13 +58,14 @@ gm_FPCA <- function(data, bin_w=10, L=4){
   
   df_s3 <- df_s2 %>% select(id, visit, bin, eta_hat) %>% 
     distinct(.) %>% 
-    pivot_wider(., names_from = bin, values_from = eta_hat)
+    pivot_wider(., names_from = bin, values_from = eta_hat) 
+  
   ## number of knots
-  nknot <- min(nrow(bin_mid)-3-1, 30)
+  nknot <- min(nrow(bin_mid)-4, 30)
   fit_mfpca <- mfpca.face(as.matrix(df_s3 %>% select(-id, -visit)),
                           id = df_s3$id, visit = df_s3$visit, 
                           argvals = as.vector(bin_mid$bin_mid),
-                          npc = L, knots = nknot, p = 3)
+                          npc = L, knots = nknot)
   
   # step 4
   print("Step 4: re-evaluation")

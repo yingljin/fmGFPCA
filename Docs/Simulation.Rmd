@@ -14,22 +14,24 @@ set.seed(625)
 
 library(tidyverse)
 library(here)
+
+load(here("Data/Sim_J3.RData"))
+
+
+
 ```
 
 # Simulation set-up
 
 This file documents the simulation scheme of multi-level functional data. 
 
-- Sample size I = 100
-- Number of visits J = 5
-- Number of sampling points K = 100
+- Sample size: training = 100, test = 100
+- Number of visits J = 3
+- Number of observations at each vitis K = 100
+- Make prediction with observations until the middle of visit 1, 2, 3 separately
+- 100 simulations
 
-```{r}
-J <- 5
-K <- 100
-t_vec <- seq(0, 1, length.out = K)
-L <- M <- 4
-```
+
 
 - Binary outcomes: 
 
@@ -44,118 +46,39 @@ $$\phi_l(t) = \{\sqrt{2}sin(2\pi t), \sqrt2 cos(2\pi t), \sqrt2 sin (4\pi t), \s
 
 $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3, 4$$
 
-```{r efuncs_l1, fig.height=3, fig.width=12}
-# level 1 eigenfunctions:
-phi_mat <- matrix(NA, nrow = K, ncol = L)
-phi_mat[, 1] <- sqrt(2)*sin(2*pi*t_vec)
-phi_mat[, 2] <- sqrt(2)*cos(2*pi*t_vec)
-phi_mat[, 3] <- sqrt(2)*sin(4*pi*t_vec)
-phi_mat[, 4] <- sqrt(2)*cos(4*pi*t_vec)
+# Results
 
-colnames(phi_mat) <- paste0("phi", 1:L)
-
-phi_mat %>% data.frame() %>%
-  mutate(t=t_vec) %>%
-  pivot_longer(starts_with("phi")) %>%
-  ggplot()+
-  geom_line(aes(x=t, y=value))+
-  facet_wrap(~name, nrow= 1)+
-  labs(x="t", y="")
-
-# level 1 eigenvalues
-lambda <- 0.5^((1:L)-1)
-```
-
-
-
-
-
-- Level 2: 
-
-$$\psi_l(t) = \{\sqrt{2}sin(6\pi t), \sqrt2 cos(6\pi t), \sqrt2 sin (8\pi t), \sqrt2 cos(8\pi t)\}$$
-
-$$\zeta_{ijm} \sim N(0, \gamma_{m}), \hspace{0.5cm} \gamma_m = 0.5^{m-1}, l=1,2, 3, 4$$
-```{r efuncs_l2, fig.height=3, fig.width=12}
-# level 2 eigenfunctions:
-psi_mat <- matrix(NA, nrow = K, ncol = M)
-psi_mat[, 1] <- sqrt(2)*sin(6*pi*t_vec)
-psi_mat[, 2] <- sqrt(2)*cos(6*pi*t_vec)
-psi_mat[, 3] <- sqrt(2)*sin(8*pi*t_vec)
-psi_mat[, 4] <- sqrt(2)*cos(8*pi*t_vec)
-
-colnames(psi_mat) <- paste0("psi", 1:M)
-
-psi_mat %>% data.frame() %>%
-  mutate(t=t_vec) %>%
-  pivot_longer(starts_with("psi")) %>%
-  ggplot()+
-  geom_line(aes(x=t, y=value))+
-  facet_wrap(~name, nrow = 1)+
-  labs(x="t", y="")
-
-# level 2 eigenvalues
-gamma <- 0.5^((1:M)-1)
-```
-
-# Generate a full datasets
-
-```{r FullData}
-N <- 100 # sample size
-df_full <- expand.grid(id=1:N, visit = 1:J, t=t_vec) %>% arrange(id, visit, t)
-df_full$eta <- NA
-
-# containers for score: 
-xi_full <- matrix(NA, nrow = N, ncol = L) # subject by eigenfunction
-zeta_full <- array(NA, dim = c(N, J, M)) # subject by visit by eigenfunction
-```
-
+## Observed until midpoint of the 3rd visit
 
 ```{r}
-# generate latent function
-for(i in 1:N){
-  # level 1 score (subject): L by 1
-  xi <- rnorm(L, 0, sqrt(lambda))
-  xi_full[i, ] <- xi
-  # level 2 score (subject-visit level): J by M
-  # zeta <- sapply(gamma, function(x){rnorm(J, mean=0, sd = sqrt(x))})
-  zeta <- rnorm(J*M, mean = 0, sd = rep(sqrt(gamma), J))
-  zeta <- matrix(zeta, nrow = J, ncol=M, byrow = T) # visit by eigenfunction
-  zeta_full[i,,] <- zeta
-  # latent function
-  ## subjectlevel
-  eta_l1 <- phi_mat %*% xi
-  eta_l1 <- rep(eta_l1, J)
-  ## subject-visit level 
-  eta_l2 <- psi_mat %*% t(zeta)
-  eta_l2 <- as.vector(eta_l2)
-  ## overall
-  eta_i <- 0 + eta_l1 + eta_l2
-  df_full[df_full$id==i, "eta"] <-  eta_i
-}
-```
-
-
-```{r}
-# generate binary outcome
-# turns out I messed up "plogis" and "logistic"
-df_full <- df_full %>% mutate(probs = exp(eta)/(1+exp(eta))) 
-df_full$Y <- rbinom(nrow(df_full), 1, df_full$probs)
-```
-
-
-```{r CheckScore}
-# check the generated scores
-apply(xi_full, 2, var)
-apply(zeta_full, MARGIN = c(2,3), var)
-```
-
-```{r CheckData, fig.height=12, fig.width=15}
-df_full %>% filter(id %in% 1:4) %>%
+pred_list_allM[[1]] %>%
+  filter(visit == 3 & id %in% 101:104) %>% 
+  mutate(eta_pred = ifelse(t<=0.5, NA, eta_pred)) %>% 
+  mutate(eta_pred = exp(eta_pred)/(1+exp(eta_pred))) %>% 
   ggplot()+
-  geom_line(aes(x=t, y=probs))+
+  geom_line(aes(x=t, y=probs, col="True"))+
+  geom_line(aes(x=t, y=eta_pred, col = "Prediction"), linetype="dashed", 
+            na.rm = T)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_grid(row = vars(id), col=vars(visit))
+  facet_grid(row = vars(id))
+```
 
-save(df_full, xi_full, zeta_full, file = here("Data/simData.RData"))
+```{r}
+print("fitting time (min):")
+mean(fit_time_vec)
+print("prediction time (min):")
+mean(pred_time_vec)
+```
+
+```{r, message=FALSE}
+print("integrated squared error")
+bind_rows(pred_list_allM, .id = "iter") %>% 
+  filter(visit==3 & t> 0.5) %>%
+  group_by(iter, id) %>% 
+  mutate(error = (eta_pred-eta)^2) %>%
+  summarise(error = sum(error)) %>% 
+  group_by(iter) %>% 
+  summarize(error = mean(error)) %>% 
+  summarize(error = mean(error), .groups = "drop")
 ```
 
