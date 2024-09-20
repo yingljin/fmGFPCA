@@ -15,9 +15,9 @@ set.seed(625)
 library(tidyverse)
 library(here)
 
-load(here("Data/Sim_J3.RData"))
+load(here("Data/SimOutput.RData"))
 
-
+valid_id <- which(pred_time_vec<=10)
 
 ```
 
@@ -51,31 +51,45 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 ## Observed until midpoint of the 3rd visit
 
 ```{r}
-pred_list_allM[[1]] %>%
-  filter(visit == 3 & id %in% 101:104) %>% 
-  mutate(eta_pred = ifelse(t<=0.5, NA, eta_pred)) %>% 
-  mutate(eta_pred = exp(eta_pred)/(1+exp(eta_pred))) %>% 
+pred_list_allM[[100]] %>%
+  filter(visit %in% 2:3 & id %in% 101:104) %>% 
+  mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
+  mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
+                              eta_pred_J3)) %>%
+  mutate(eta_pred_J3 = exp(eta_pred_J3)/(1+exp(eta_pred_J3)),
+         eta_pred_J2 = exp(eta_pred_J2)/(1+exp(eta_pred_J2))) %>% 
   ggplot()+
   geom_line(aes(x=t, y=probs, col="True"))+
-  geom_line(aes(x=t, y=eta_pred, col = "Prediction"), linetype="dashed", 
+  geom_line(aes(x=t, y=eta_pred_J2, col = "Visit 2"), linetype="dashed", 
+            na.rm = T)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "Visit 3"), linetype="dashed", 
             na.rm = T)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_grid(row = vars(id))
+  facet_grid(row = vars(id), col=vars(visit))
 ```
 
 ```{r}
 print("fitting time (min):")
-mean(fit_time_vec)
+mean(fit_time_vec[valid_id])
 print("prediction time (min):")
-mean(pred_time_vec)
+mean(pred_time_vec[valid_id])
 ```
 
 ```{r, message=FALSE}
 print("integrated squared error")
-bind_rows(pred_list_allM, .id = "iter") %>% 
+bind_rows(pred_list_allM[valid_id], .id = "iter") %>% 
   filter(visit==3 & t> 0.5) %>%
   group_by(iter, id) %>% 
-  mutate(error = (eta_pred-eta)^2) %>%
+  mutate(error = (eta_pred_J3-eta)^2) %>%
+  summarise(error = sum(error)) %>% 
+  group_by(iter) %>% 
+  summarize(error = mean(error)) %>% 
+  summarize(error = mean(error), .groups = "drop")
+
+bind_rows(pred_list_allM[valid_id], .id = "iter") %>% 
+  filter((visit==3)|(visit==2 & t>0.5))%>%
+  group_by(iter, id) %>% 
+  mutate(error = (eta_pred_J2-eta)^2) %>%
   summarise(error = sum(error)) %>% 
   group_by(iter) %>% 
   summarize(error = mean(error)) %>% 
