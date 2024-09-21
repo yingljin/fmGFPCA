@@ -16,7 +16,7 @@ set.seed(915)
 # devtools::install_github("julia-wrobel/fastGFPCA", build_vignettes = TRUE)
 
 # toy simulation scheme
-# N_train = 40,  N_test = 10, J = 3, K = 100
+# N_train = 100,  N_test = 100, J = 3, K = 200
 # observations stops at the the midpoint of each visit
 # bin every 10 observations
 # number of FPC = 4
@@ -26,40 +26,61 @@ Ntr <- 100
 Nte <- 100
 
 J <- 3 # total number of visits
-K <- 100
+K <- 200
 
 #### Generate data ####
 
 
 # containers
-data_list_allM <- list()
+data_list_allM_J200 <- list()
 
 for(m in 1:M){
   # generate training data
-  data_all <- gen_bi(N = Ntr+Nte, J = J, K = k, 
-                     t_vec = seq(0, 1, length.out = k),
+  data_all <- gen_bi(N = Ntr+Nte, J = J, K = K, 
+                     t_vec = seq(0, 1, length.out = K),
                      L = 4, M = 4, 
                      lambda = 0.5^((1:4)-1), 
                      gamma =  0.5^((1:4)-1))
   data_all$data$id <- as.factor(data_all$data$id)
   data_all$data$visit <- as.factor(data_all$data$visit)
-  data_list_allM[[m]] <- data_all$data
+  data_list_allM_J200[[m]] <- data_all$data
 }
 
-save(data_list_allM, 
-     file = here("Data/SimData.RData")) # data that will be used for all of simulation
+# check
+
+data_list_allM_J200[[1]] %>% filter(id %in% sample(1:200, 4)) %>% 
+  ggplot()+
+  geom_line(aes(x=t, y=probs))+
+  geom_point(aes(x=t, y=Y), size = 0.5)+
+  facet_grid(row = vars(id), col=vars(visit))
+
+save(data_list_allM_J200, 
+     file = here("Data/SimData/SimData_J200.RData")) # data that will be used for all of simulation
+
+
+
+
 
 
 #### gmFPCA ####
 
-load(here("Data/SimData.RData"))
+# load(here("Data/SimData.RData"))
+
+load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
+
+M <- 5
 
 fit_time_vec <- rep(NA, M)
 pred_time_vec <- rep(NA, M)
 pred_list_allM <- list()
 
+# data
+data_list_allM <- data_list_allM_J200
+
+
+# simulation
 for(m in 1:M){
   
   data_all <- data_list_allM[[m]]
@@ -84,7 +105,7 @@ for(m in 1:M){
   
   ## container
   pred_df_m <- data_all %>% filter(id %in% te_id) %>% 
-    mutate(eta_pred_J2 = NA, eta_pred_J1 = NA,
+    mutate(eta_pred_J2 = NA, eta_pred_J3 = NA,
            id = droplevels(id))
   
   ## prediction
@@ -157,8 +178,22 @@ for(m in 1:M){
   print(paste0(m, "/", M, " simulation completed"))
 }
 
+# check
+pred_list_allM[[1]] %>% #head()
+  filter(id %in% sample(101:200, 4)) %>% #head()
+  # filter(id==41) %>%
+  mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>%
+  ggplot()+
+  geom_line(aes(x=t, y=probs, col = "True"))+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed")+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
+  # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
+  # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
+  facet_grid(rows = vars(id), cols = vars(visit))
+
+
 save(fit_time_vec, pred_time_vec, pred_list_allM, 
-     file = here("Data/SimOutput.RData"))
+     file = here("Data/SimOutput_J200.RData"))
 
 
 
@@ -174,23 +209,7 @@ save(fit_time_vec, pred_time_vec, pred_list_allM,
 #### Figures ####
 
 # data
-data_tr$data %>% filter(id %in% 16:19) %>%
-  ggplot()+
-  geom_line(aes(x=t, y=probs))+
-  geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_grid(row = vars(id), col=vars(visit))
 
-pred_list_allM[[1]] %>% #head()
-  filter(id %in% sample(101:200, 4)) %>%
-  # filter(id==41) %>%
-  mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>%
-  ggplot()+
-  geom_line(aes(x=t, y=eta, col = "True"))+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "J2"))+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"))+
-  # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
-  # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
-  facet_grid(rows = vars(id), cols = vars(visit))
 
 mean(fit_time_vec) # 0.5 minutes each simulation
 mean(pred_time_vec) # 2 minutes each simulation

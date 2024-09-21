@@ -15,7 +15,7 @@ set.seed(625)
 library(tidyverse)
 library(here)
 
-load(here("Data/SimOutput.RData"))
+load(here("Data/SimOutput/SimOutput_J100.RData"))
 
 valid_id <- which(pred_time_vec<=10)
 
@@ -51,7 +51,7 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 ## Observed until midpoint of the 3rd visit
 
 ```{r}
-pred_list_allM[[100]] %>%
+pred_list_allM[[1]] %>%
   filter(visit %in% 2:3 & id %in% 101:104) %>% 
   mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
   mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
