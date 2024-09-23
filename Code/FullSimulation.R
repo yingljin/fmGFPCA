@@ -1,3 +1,6 @@
+
+#### Set up ####
+
 library(here)
 library(tidyverse)
 library(lme4)
@@ -5,6 +8,7 @@ library(mgcv)
 library(refund)
 library(rstan)
 library(instantiate)
+library(GLMMadaptive)
 
 
 source(here("Code/Functions/Simulation.R"))
@@ -62,6 +66,8 @@ save(data_list_allM_J200,
 
 
 
+
+
 #### gmFPCA ####
 
 # load(here("Data/SimData.RData"))
@@ -70,7 +76,7 @@ load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-M <- 5
+# M <- 5
 
 fit_time_vec <- rep(NA, M)
 pred_time_vec <- rep(NA, M)
@@ -78,6 +84,7 @@ pred_list_allM <- list()
 
 # data
 data_list_allM <- data_list_allM_J200
+rm(data_list_allM_J200)
 
 
 # simulation
@@ -179,7 +186,7 @@ for(m in 1:M){
 }
 
 # check
-pred_list_allM[[1]] %>% #head()
+pred_list_allM[[100]] %>% #head()
   filter(id %in% sample(101:200, 4)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>%
@@ -193,12 +200,14 @@ pred_list_allM[[1]] %>% #head()
 
 
 save(fit_time_vec, pred_time_vec, pred_list_allM, 
-     file = here("Data/SimOutput_J200.RData"))
+     file = here("Data/SimOutput/imOutput_J200.RData"))
 
 
+mean(fit_time_vec) # 0.5 minutes each simulation
+mean(pred_time_vec) # 2 minutes each simulation
 
 
-# There are numeric problems here:
+# When K = 100, a few numeric problems happened: 
 ## Tail Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
 ## estimated Bayesian Fraction of Missing Information was low
 ## chains have not mixed.
@@ -206,12 +215,107 @@ save(fit_time_vec, pred_time_vec, pred_list_allM,
 ## Some datasets had very, very long prediction time
 
 
-#### Figures ####
+
+
+
+#### GLMMadaptive ####
+load(here("Data/SimData/SimData_J200.RData"))
+
+tmax <- 0.5 # max time of observation
+
+M <- 5
+# containers
+fit_time_vec_ref <- rep(NA, M)
+pred_time_vec_ref <- rep(NA, M)
+pred_list_allM_ref <- list()
 
 # data
+data_list_allM <- data_list_allM_J200
+rm(data_list_allM_J200)
+
+m <- 1
+# simulation
+for(m in 1:M){
+  
+  data_all <- data_list_allM[[m]] %>% 
+    mutate(id_visit = paste0(id, "_", visit))
+  
+  # data split
+  ## training '
+  data_tr <- data_all %>% filter(id %in% 1:Ntr) %>% 
+     mutate(id = droplevels(id))
+  ## test
+  data_te <- data_all %>% filter(!id %in% 1:Ntr) %>%
+    mutate(id = droplevels(id))
+  
+  tic <- Sys.time()
+  # mixed model with nested grouping effect
+  glmm_fit <- mixed_model(fixed = Y ~ t, random = ~ t | id_visit, 
+                          data = data_tr,
+                    family = binomial())
+  toc <- Sys.time()
+  fit_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
+  
+  
+  # prediction
+  tic <- Sys.time()
+  ## predict conditioning on visit 1 and half of visit 3
+  pred_J3 <- predict(glmm_fit, 
+                     newdata = data_te %>% filter(visit==1|visit==2|(visit==3&t<=tmax)),
+                     newdata2 = data_te,
+                     type_pred = "link", type = "subject_specific",
+                     return_newdata = T)$newdata2
+
+  ## predict conditioning on visit 1 and half of visit 2
+  pred_J2 <- predict(glmm_fit, 
+                     newdata = data_te %>% filter(visit==1|(visit==2&t<=tmax)),
+                     newdata2 = data_te %>% filter(visit==1|visit==2),
+                     type_pred = "link", type = "subject_specific",
+                     return_newdata = T)
+  ## The third visit will be filled with marginal effect
+  toc <- Sys.time()
+  pred_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
+
+  pred_df_m <- full_join(pred_J3 %>% select(id, visit, t, eta, Y, pred) %>% 
+                           rename(eta_pred_J3=pred),
+                         pred_J3 %>% select(id, visit, t, pred) %>% 
+                           rename(eta_pred_J2=pred),
+                         by = c("id", "visit", "t"))
+
+  pred_list_allM_ref[[m]] <- pred_df_m
+  
+  # print progress
+  print(paste0(m, "/", M, " simulation completed"))
+}
 
 
-mean(fit_time_vec) # 0.5 minutes each simulation
-mean(pred_time_vec) # 2 minutes each simulation
+
+# GLMM model: 
+## fixed = Y ~ t, random = ~ t | id/visit: vector memory exhausted
+## fixed = Y ~ 1, random = ~ 1 | id/visit: take 10 minutes
+## fixed = Y ~ t+I(t^2), random = ~ t + I(t^2) | id_visit, takes about 3 minutes? 
+## it does not seem to handle nested models very well
+## can't predict unobserved visits
+## We need a better reference method
+## Maybe use Alpine? 
+mean(fit_time_vec_ref) # 0.6 minutes each simulation
+mean(pred_time_vec_ref) # 0.0115 minutes each simulation
+
+# check
+pred_list_allM_ref[[1]] %>% #head()
+  filter(id %in% sample(101:200, 4)) %>% #head()
+  # filter(id==41) %>%
+  mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>%
+  ggplot()+
+  geom_line(aes(x=t, y=eta, col = "True"))+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed")+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
+  # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
+  # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
+  facet_grid(rows = vars(id), cols = vars(visit))
+
+
+save(fit_time_vec_ref, pred_time_vec_ref, pred_list_allM_ref, 
+     file = here("Data/SimOutput/SimOutput_J200_ref.RData"))
 
 

@@ -15,9 +15,11 @@ set.seed(625)
 library(tidyverse)
 library(here)
 
-load(here("Data/SimOutput/SimOutput_J100.RData"))
+load(here("Data/SimOutput/SimOutput_J200.RData"))
+load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
 
-valid_id <- which(pred_time_vec<=10)
+
+# valid_id <- which(pred_time_vec<=10)
 
 ```
 
@@ -27,8 +29,8 @@ This file documents the simulation scheme of multi-level functional data.
 
 - Sample size: training = 100, test = 100
 - Number of visits J = 3
-- Number of observations at each vitis K = 100
-- Make prediction with observations until the middle of visit 1, 2, 3 separately
+- Number of observations at each vitis K = 200 (when K = 100, numeric issues are likely to happen)
+- Make prediction with observations until the middle of visit 2 and 3 separately
 - 100 simulations
 
 
@@ -52,7 +54,7 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 
 ```{r}
 pred_list_allM[[1]] %>%
-  filter(visit %in% 2:3 & id %in% 101:104) %>% 
+  filter(visit %in% 2:3 & id %in% 101:104) %>%
   mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
   mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
                               eta_pred_J3)) %>%
@@ -65,28 +67,50 @@ pred_list_allM[[1]] %>%
   geom_line(aes(x=t, y=eta_pred_J3, col = "Visit 3"), linetype="dashed", 
             na.rm = T)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_grid(row = vars(id), col=vars(visit))
+  facet_grid(row = vars(id), col=vars(visit))+
+  labs(title = "gmFPCA")
+```
+
+
+```{r}
+pred_list_allM_ref[[1]] %>%
+  filter(visit %in% 2:3 & id %in% 101:104) %>%
+  mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
+  mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
+                              eta_pred_J3)) %>%
+  mutate(eta_pred_J3 = exp(eta_pred_J3)/(1+exp(eta_pred_J3)),
+         eta_pred_J2 = exp(eta_pred_J2)/(1+exp(eta_pred_J2)), 
+         eta = exp(eta)/(1+exp(eta))) %>% 
+  ggplot()+
+  geom_line(aes(x=t, y=eta, col="True"))+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "Visit 2"), linetype="dashed", 
+            na.rm = T)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "Visit 3"), linetype="dashed", 
+            na.rm = T)+
+  geom_point(aes(x=t, y=Y), size = 0.5)+
+  facet_grid(row = vars(id), col=vars(visit))+
+  labs(title = "gmFPCA")
 ```
 
 ```{r}
 print("fitting time (min):")
-mean(fit_time_vec[valid_id])
+mean(fit_time_vec)
 print("prediction time (min):")
-mean(pred_time_vec[valid_id])
+mean(pred_time_vec)
 ```
 
 ```{r, message=FALSE}
 print("integrated squared error")
-bind_rows(pred_list_allM[valid_id], .id = "iter") %>% 
+bind_rows(pred_list_allM, .id = "iter") %>% 
   filter(visit==3 & t> 0.5) %>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J3-eta)^2) %>%
   summarise(error = sum(error)) %>% 
-  group_by(iter) %>% 
-  summarize(error = mean(error)) %>% 
+  group_by(iter) %>%
+  summarize(error = mean(error)) %>%
   summarize(error = mean(error), .groups = "drop")
 
-bind_rows(pred_list_allM[valid_id], .id = "iter") %>% 
+bind_rows(pred_list_allM, .id = "iter") %>% 
   filter((visit==3)|(visit==2 & t>0.5))%>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J2-eta)^2) %>%
