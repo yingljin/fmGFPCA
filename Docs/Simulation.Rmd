@@ -5,6 +5,9 @@ date: "`r Sys.Date()`"
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_float: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +17,7 @@ set.seed(625)
 
 library(tidyverse)
 library(here)
+library(kableExtra)
 
 load(here("Data/SimOutput/SimOutput_J200.RData"))
 load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
@@ -50,7 +54,7 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 
 # Results
 
-## Observed until midpoint of the 3rd visit
+## Figure
 
 ```{r}
 pred_list_allM[[1]] %>%
@@ -89,34 +93,75 @@ pred_list_allM_ref[[1]] %>%
             na.rm = T)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))+
-  labs(title = "gmFPCA")
+  labs(title = "GLMMadaptive")
 ```
+
+# Computation time
 
 ```{r}
-print("fitting time (min):")
-mean(fit_time_vec)
-print("prediction time (min):")
-mean(pred_time_vec)
+# print("Computation time:")
+data.frame("gmFPCA" = c(mean(fit_time_vec), 
+                        mean(pred_time_vec)),
+           "GLMMadaptive" = c(mean(fit_time_vec_ref),
+                              mean(pred_time_vec_ref))) %>% 
+  mutate("Time (mins)" = c("Fit", "Prediction"), .before=1) %>%
+  kable(digits = 2) %>% 
+  kable_styling(full_width = F)
+
+
+
 ```
 
+
+# Integerated squared error
+
+- Over the entire prediction window
+
 ```{r, message=FALSE}
-print("integrated squared error")
-bind_rows(pred_list_allM, .id = "iter") %>% 
+ise_J3 <- bind_rows(pred_list_allM, .id = "iter") %>% 
   filter(visit==3 & t> 0.5) %>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J3-eta)^2) %>%
   summarise(error = sum(error)) %>% 
   group_by(iter) %>%
   summarize(error = mean(error)) %>%
-  summarize(error = mean(error), .groups = "drop")
+  summarize(error = mean(error), .groups = "drop") %>% unlist()
 
-bind_rows(pred_list_allM, .id = "iter") %>% 
+ise_J2 <- bind_rows(pred_list_allM, .id = "iter") %>% 
   filter((visit==3)|(visit==2 & t>0.5))%>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J2-eta)^2) %>%
   summarise(error = sum(error)) %>% 
   group_by(iter) %>% 
   summarize(error = mean(error)) %>% 
-  summarize(error = mean(error), .groups = "drop")
+  summarize(error = mean(error), .groups = "drop") %>% unlist()
+
+
+ise_J3_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
+  filter(visit==3 & t> 0.5) %>%
+  group_by(iter, id) %>% 
+  mutate(error = (eta_pred_J3-eta)^2) %>%
+  summarise(error = sum(error)) %>% 
+  group_by(iter) %>%
+  summarize(error = mean(error)) %>%
+  summarize(error = mean(error), .groups = "drop") %>% unlist()
+
+ise_J2_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
+  filter((visit==3)|(visit==2 & t>0.5))%>%
+  group_by(iter, id) %>% 
+  mutate(error = (eta_pred_J2-eta)^2) %>%
+  summarise(error = sum(error)) %>% 
+  group_by(iter) %>% 
+  summarize(error = mean(error)) %>% 
+  summarize(error = mean(error), .groups = "drop") %>% unlist()
+```
+
+```{r}
+# print("Integrated squared error:")
+data.frame("gmFPCA" = c(ise_J2, ise_J3),
+           "GLMMadaptive" = c(ise_J2_ref, ise_J3_ref)) %>% 
+  mutate("Prediciton window" = c("Visit 2, t=0.5 to Visit 3, t=1", "Visit 3, t=0.5 to visit 3, t=1"), .before=1) %>%
+  kable(digits = 2) %>% 
+  kable_styling(full_width = F)
 ```
 

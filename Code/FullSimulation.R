@@ -223,7 +223,7 @@ load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-M <- 5
+# M <- 5
 # containers
 fit_time_vec_ref <- rep(NA, M)
 pred_time_vec_ref <- rep(NA, M)
@@ -233,7 +233,7 @@ pred_list_allM_ref <- list()
 data_list_allM <- data_list_allM_J200
 rm(data_list_allM_J200)
 
-m <- 1
+# m <- 1
 # simulation
 for(m in 1:M){
   
@@ -302,7 +302,7 @@ mean(fit_time_vec_ref) # 0.6 minutes each simulation
 mean(pred_time_vec_ref) # 0.0115 minutes each simulation
 
 # check
-pred_list_allM_ref[[1]] %>% #head()
+pred_list_allM_ref[[100]] %>% #head()
   filter(id %in% sample(101:200, 4)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>%
