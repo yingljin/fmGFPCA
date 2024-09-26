@@ -128,7 +128,7 @@ ise_J3 <- bind_rows(pred_list_allM, .id = "iter") %>%
   summarize(error = mean(error), .groups = "drop") %>% unlist()
 
 ise_J2 <- bind_rows(pred_list_allM, .id = "iter") %>% 
-  filter((visit==3)|(visit==2 & t>0.5))%>%
+  filter(visit==2 & t>0.5) %>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J2-eta)^2) %>%
   summarise(error = sum(error)) %>% 
@@ -147,7 +147,7 @@ ise_J3_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>%
   summarize(error = mean(error), .groups = "drop") %>% unlist()
 
 ise_J2_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
-  filter((visit==3)|(visit==2 & t>0.5))%>%
+  filter(visit==2 & t>0.5) %>%
   group_by(iter, id) %>% 
   mutate(error = (eta_pred_J2-eta)^2) %>%
   summarise(error = sum(error)) %>% 
@@ -160,7 +160,7 @@ ise_J2_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>%
 # print("Integrated squared error:")
 data.frame("gmFPCA" = c(ise_J2, ise_J3),
            "GLMMadaptive" = c(ise_J2_ref, ise_J3_ref)) %>% 
-  mutate("Prediciton window" = c("Visit 2, t=0.5 to Visit 3, t=1", "Visit 3, t=0.5 to visit 3, t=1"), .before=1) %>%
+  mutate("Prediciton window" = c("Visit 2", "Visit 3"), .before=1) %>%
   kable(digits = 2) %>% 
   kable_styling(full_width = F)
 ```

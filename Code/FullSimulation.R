@@ -9,7 +9,7 @@ library(refund)
 library(rstan)
 library(instantiate)
 library(GLMMadaptive)
-
+library(splines)
 
 source(here("Code/Functions/Simulation.R"))
 source(here("Code/Functions/gmFPCA_func.R"))
@@ -223,7 +223,7 @@ load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-# M <- 5
+#M <- 3
 # containers
 fit_time_vec_ref <- rep(NA, M)
 pred_time_vec_ref <- rep(NA, M)
@@ -233,7 +233,7 @@ pred_list_allM_ref <- list()
 data_list_allM <- data_list_allM_J200
 rm(data_list_allM_J200)
 
-# m <- 1
+#m <- 1
 # simulation
 for(m in 1:M){
   
@@ -250,9 +250,16 @@ for(m in 1:M){
   
   tic <- Sys.time()
   # mixed model with nested grouping effect
-  glmm_fit <- mixed_model(fixed = Y ~ t, random = ~ t | id_visit, 
+  ## technically, this is not nesting. But the real nesting one is not fittable
+  glmm_fit <- mixed_model(fixed = Y ~ ns(t, df = 2), 
+                          random = ~ ns(t, df = 2)  | id_visit,
                           data = data_tr,
                     family = binomial())
+  # with spline basis? 
+  # glmm_fit <- mixed_model(fixed = Y ~ 1, 
+  #                         random = ~ 1 | id/visit, 
+  #                         data = data_tr,
+  #                         family = binomial())
   toc <- Sys.time()
   fit_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
   
@@ -271,14 +278,14 @@ for(m in 1:M){
                      newdata = data_te %>% filter(visit==1|(visit==2&t<=tmax)),
                      newdata2 = data_te %>% filter(visit==1|visit==2),
                      type_pred = "link", type = "subject_specific",
-                     return_newdata = T)
-  ## The third visit will be filled with marginal effect
+                     return_newdata = T)$newdata2
+
   toc <- Sys.time()
   pred_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
 
   pred_df_m <- full_join(pred_J3 %>% select(id, visit, t, eta, Y, pred) %>% 
                            rename(eta_pred_J3=pred),
-                         pred_J3 %>% select(id, visit, t, pred) %>% 
+                         pred_J2 %>% select(id, visit, t, pred) %>% 
                            rename(eta_pred_J2=pred),
                          by = c("id", "visit", "t"))
 
@@ -291,9 +298,14 @@ for(m in 1:M){
 
 
 # GLMM model: 
+## If use nested design (id/visit), R cannot handle more than an intercept
+## It also had problems with out-of-sample prediction
 ## fixed = Y ~ t, random = ~ t | id/visit: vector memory exhausted
 ## fixed = Y ~ 1, random = ~ 1 | id/visit: take 10 minutes
+
+## If use cross design (id_visit), then cannot predict unobserved track
 ## fixed = Y ~ t+I(t^2), random = ~ t + I(t^2) | id_visit, takes about 3 minutes? 
+
 ## it does not seem to handle nested models very well
 ## can't predict unobserved visits
 ## We need a better reference method
@@ -302,14 +314,15 @@ mean(fit_time_vec_ref) # 0.6 minutes each simulation
 mean(pred_time_vec_ref) # 0.0115 minutes each simulation
 
 # check
-pred_list_allM_ref[[100]] %>% #head()
+pred_list_allM_ref[[1]] %>% #head()
+#pred_df_m %>% 
   filter(id %in% sample(101:200, 4)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>%
   ggplot()+
   geom_line(aes(x=t, y=eta, col = "True"))+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed")+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed", alpha = 0.5)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed", alpha = 0.5)+
   # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   facet_grid(rows = vars(id), cols = vars(visit))
