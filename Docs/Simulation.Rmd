@@ -12,6 +12,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(knitr.kable.NA = '')
 
 set.seed(625)
 
@@ -58,17 +59,18 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 
 ```{r}
 pred_list_allM[[1]] %>%
-  filter(visit %in% 2:3 & id %in% 101:104) %>%
-  mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
-  mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
-                              eta_pred_J3)) %>%
-  mutate(eta_pred_J3 = exp(eta_pred_J3)/(1+exp(eta_pred_J3)),
-         eta_pred_J2 = exp(eta_pred_J2)/(1+exp(eta_pred_J2))) %>% 
+  filter(id %in% 101:104) %>%
+  mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
+         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
+  mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
   geom_line(aes(x=t, y=probs, col="True"))+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "Visit 2"), linetype="dashed", 
+  geom_line(aes(x=t, y=eta_pred_J1, col = "No full visits"), linetype="dashed", 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "Visit 3"), linetype="dashed", 
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), linetype="dashed", 
+            na.rm = T)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), linetype="dashed", 
             na.rm = T)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))+
@@ -78,19 +80,19 @@ pred_list_allM[[1]] %>%
 
 ```{r}
 pred_list_allM_ref[[1]] %>%
-  filter(visit %in% 2:3 & id %in% 101:104) %>%
-  mutate(eta_pred_J2 = ifelse(visit==1|(visit==2&t<=0.5), NA, eta_pred_J2)) %>%
-  mutate(eta_pred_J3 = ifelse(visit==1|visit==2|(visit==3&t<=0.5), NA,
-                              eta_pred_J3)) %>%
-  mutate(eta_pred_J3 = exp(eta_pred_J3)/(1+exp(eta_pred_J3)),
-         eta_pred_J2 = exp(eta_pred_J2)/(1+exp(eta_pred_J2)), 
-         eta = exp(eta)/(1+exp(eta))) %>% 
+  filter(id %in% 101:104) %>%
+  mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
+         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
+  mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
   geom_line(aes(x=t, y=eta, col="True"))+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "Visit 2"), linetype="dashed", 
-            na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "Visit 3"), linetype="dashed", 
-            na.rm = T)+
+  geom_line(aes(x=t, y=eta_pred_J1, col = "No full visits"), linetype="dashed", 
+            na.rm = T, alpha = 0.5, linewidth = 1)+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), linetype="dashed",
+            na.rm = T, alpha = 0.5, linewidth = 0.8)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visit"), linetype="dashed",
+            na.rm = T, alpha = 0.5, linewidth = 0.6)+
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))+
   labs(title = "GLMMadaptive")
@@ -118,50 +120,56 @@ data.frame("gmFPCA" = c(mean(fit_time_vec),
 - Over the entire prediction window
 
 ```{r, message=FALSE}
-ise_J3 <- bind_rows(pred_list_allM, .id = "iter") %>% 
-  filter(visit==3 & t> 0.5) %>%
-  group_by(iter, id) %>% 
-  mutate(error = (eta_pred_J3-eta)^2) %>%
-  summarise(error = sum(error)) %>% 
-  group_by(iter) %>%
-  summarize(error = mean(error)) %>%
-  summarize(error = mean(error), .groups = "drop") %>% unlist()
+ise_gmfpca <- bind_rows(pred_list_allM, .id = "iter") %>% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %>%
+  mutate(error_J1 = (eta_pred_J1-eta)^2,
+         error_J2 = (eta_pred_J2-eta)^2,
+         error_J3 = (eta_pred_J3-eta)^2) %>%
+  group_by(iter, visit, window, id) %>%
+  summarise_at(vars(starts_with("error_")), sum) %>% 
+  group_by(iter, visit, window) %>%
+  summarise_at(vars(starts_with("error_")), mean) %>% 
+  group_by(visit, window) %>%
+  summarise_at(vars(starts_with("error_")), mean)
 
-ise_J2 <- bind_rows(pred_list_allM, .id = "iter") %>% 
-  filter(visit==2 & t>0.5) %>%
-  group_by(iter, id) %>% 
-  mutate(error = (eta_pred_J2-eta)^2) %>%
-  summarise(error = sum(error)) %>% 
-  group_by(iter) %>% 
-  summarize(error = mean(error)) %>% 
-  summarize(error = mean(error), .groups = "drop") %>% unlist()
+ise_gmfpca <- ise_gmfpca %>% filter(window == "(0.5,1]")
+ise_gmfpca$error_J2[1] <- NA
+ise_gmfpca$error_J3[1:2] <- NA
+colnames(ise_gmfpca) <- c("Visit", "Time",
+                          "All half visits", "Full visit 1, half visit 2 and 3",
+                          "Full visit 1 and 2, half visit 3")
+```
 
 
-ise_J3_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
-  filter(visit==3 & t> 0.5) %>%
-  group_by(iter, id) %>% 
-  mutate(error = (eta_pred_J3-eta)^2) %>%
-  summarise(error = sum(error)) %>% 
-  group_by(iter) %>%
-  summarize(error = mean(error)) %>%
-  summarize(error = mean(error), .groups = "drop") %>% unlist()
+```{r}
+ise_glmmad <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %>%
+  mutate(error_J1 = (eta_pred_J1-eta)^2,
+         error_J2 = (eta_pred_J2-eta)^2,
+         error_J3 = (eta_pred_J3-eta)^2) %>%
+  group_by(iter, visit, window, id) %>%
+  summarise_at(vars(starts_with("error_")), sum) %>% 
+  group_by(iter, visit, window) %>%
+  summarise_at(vars(starts_with("error_")), mean) %>% 
+  group_by(visit, window) %>%
+  summarise_at(vars(starts_with("error_")), mean)  
 
-ise_J2_ref <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
-  filter(visit==2 & t>0.5) %>%
-  group_by(iter, id) %>% 
-  mutate(error = (eta_pred_J2-eta)^2) %>%
-  summarise(error = sum(error)) %>% 
-  group_by(iter) %>% 
-  summarize(error = mean(error)) %>% 
-  summarize(error = mean(error), .groups = "drop") %>% unlist()
+ise_glmmad <- ise_glmmad %>% filter(window == "(0.5,1]")
+ise_glmmad$error_J2[1] <- NA
+ise_glmmad$error_J3[1:2] <- NA
+colnames(ise_glmmad) <- c("Visit", "Time",
+                          "All half visits", "Full visit 1, half visit 2 and 3",
+                          "Full visit 1 and 2, half visit 3")
 ```
 
 ```{r}
 # print("Integrated squared error:")
-data.frame("gmFPCA" = c(ise_J2, ise_J3),
-           "GLMMadaptive" = c(ise_J2_ref, ise_J3_ref)) %>% 
-  mutate("Prediciton window" = c("Visit 2", "Visit 3"), .before=1) %>%
+ise_gmfpca %>% 
+  add_column(ise_glmmad[,3:5], .name_repair = "minimal") %>%
   kable(digits = 2) %>% 
-  kable_styling(full_width = F)
+  kable_styling(full_width = F) %>%
+  add_header_above(c("Prediction window" = 2,
+                         "Observed window" = 6))
 ```
 
+For visit 3, the predictions are identical. This is not a coding error. Because prediction of the three visits are made at the same time, and the other visits are not identical. 

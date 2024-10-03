@@ -112,22 +112,23 @@ for(m in 1:M){
   
   ## container
   pred_df_m <- data_all %>% filter(id %in% te_id) %>% 
-    mutate(eta_pred_J2 = NA, eta_pred_J3 = NA,
+    mutate(eta_pred_J1 = NA, eta_pred_J2 = NA, eta_pred_J3 = NA,
            id = droplevels(id))
   
   ## prediction
   tic <- Sys.time()
   for(i in seq_along(te_id)){ # for a subject
     
-    for(j in 2:J){ # a given observation track
+    for(j in 1:J){ # a given observation track
     
-      # prediction conditioning on 2.5 visit
+      # prediction conditioning on half visits from the jth visit
+      # for visits before the jth visit, full track
+      # for visits from the jth visit, half track
       df_te_ij <- data_te %>% filter(id == te_id[i]) %>% 
-        filter(as.numeric(visit) <= j) %>% 
-        filter(!(visit==j & t>tmax))
-    
+        filter(as.numeric(visit)<j | t<=tmax) 
+      
       pred_data <- list(J = J, K = K,
-                        Ju = j, Ku = table(df_te_ij$visit)[1:j], 
+                        Ju = J, Ku = table(df_te_ij$visit), 
                         Nobs = nrow(df_te_ij), Y = df_te_ij$Y,
                         L = 4, M = 4,
                         efuncs_l1 = gmfpca_fit$efuncs_l1,
@@ -187,11 +188,13 @@ for(m in 1:M){
 
 # check
 pred_list_allM[[100]] %>% #head()
+# pred_df_m %>%
   filter(id %in% sample(101:200, 4)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>%
   ggplot()+
   geom_line(aes(x=t, y=probs, col = "True"))+
+  geom_line(aes(x=t, y=eta_pred_J1, col = "J1"), linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
   # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
@@ -200,11 +203,11 @@ pred_list_allM[[100]] %>% #head()
 
 
 save(fit_time_vec, pred_time_vec, pred_list_allM, 
-     file = here("Data/SimOutput/imOutput_J200.RData"))
+     file = here("Data/SimOutput/SimOutput_J200.RData"))
 
 
-mean(fit_time_vec) # 0.5 minutes each simulation
-mean(pred_time_vec) # 2 minutes each simulation
+mean(fit_time_vec) # 0.4 minutes each simulation
+mean(pred_time_vec) # 5.4 minutes each simulation
 
 
 # When K = 100, a few numeric problems happened: 
@@ -223,7 +226,7 @@ load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-#M <- 3
+# M <- 5
 # containers
 fit_time_vec_ref <- rep(NA, M)
 pred_time_vec_ref <- rep(NA, M)
@@ -233,7 +236,7 @@ pred_list_allM_ref <- list()
 data_list_allM <- data_list_allM_J200
 rm(data_list_allM_J200)
 
-#m <- 1
+# m <- 1
 # simulation
 for(m in 1:M){
   
@@ -251,13 +254,14 @@ for(m in 1:M){
   tic <- Sys.time()
   # mixed model with nested grouping effect
   ## technically, this is not nesting. But the real nesting one is not fittable
-  glmm_fit <- mixed_model(fixed = Y ~ ns(t, df = 2), 
+  # with spline basis? 
+  glmm_fit <- mixed_model(fixed = Y ~ ns(t, df = 2),
                           random = ~ ns(t, df = 2)  | id_visit,
                           data = data_tr,
                     family = binomial())
-  # with spline basis? 
-  # glmm_fit <- mixed_model(fixed = Y ~ 1, 
-  #                         random = ~ 1 | id/visit, 
+  # linear model
+  # glmm_fit <- mixed_model(fixed = Y ~ t,
+  #                         random = ~ t | id_visit,
   #                         data = data_tr,
   #                         family = binomial())
   toc <- Sys.time()
@@ -266,28 +270,36 @@ for(m in 1:M){
   
   # prediction
   tic <- Sys.time()
+  ## predict conditioning three half visits
+  pred_J1 <- predict(glmm_fit, 
+                     newdata = data_te %>% filter(t <= tmax),
+                     newdata2 = data_te %>% filter(t > tmax),
+                     type_pred = "link", type = "subject_specific",
+                     return_newdata = T)$newdata2
+  
   ## predict conditioning on visit 1 and half of visit 3
-  pred_J3 <- predict(glmm_fit, 
-                     newdata = data_te %>% filter(visit==1|visit==2|(visit==3&t<=tmax)),
+  pred_J2 <- predict(glmm_fit, 
+                     newdata = data_te %>% filter(visit==1|(visit %in% 2:3 & t<=tmax)),
                      newdata2 = data_te,
                      type_pred = "link", type = "subject_specific",
                      return_newdata = T)$newdata2
 
   ## predict conditioning on visit 1 and half of visit 2
-  pred_J2 <- predict(glmm_fit, 
-                     newdata = data_te %>% filter(visit==1|(visit==2&t<=tmax)),
-                     newdata2 = data_te %>% filter(visit==1|visit==2),
+  pred_J3 <- predict(glmm_fit, 
+                     newdata = data_te %>% filter(visit %in% 1:2|(visit==3&t<=tmax)),
+                     newdata2 = data_te,
                      type_pred = "link", type = "subject_specific",
                      return_newdata = T)$newdata2
 
   toc <- Sys.time()
   pred_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
 
-  pred_df_m <- full_join(pred_J3 %>% select(id, visit, t, eta, Y, pred) %>% 
-                           rename(eta_pred_J3=pred),
-                         pred_J2 %>% select(id, visit, t, pred) %>% 
-                           rename(eta_pred_J2=pred),
-                         by = c("id", "visit", "t"))
+  pred_df_m <- pred_J3 %>% select(id, visit, t, eta, Y, pred) %>% 
+    rename(eta_pred_J3=pred) %>% 
+    left_join(pred_J2 %>% select(id, visit, t, pred) %>% rename(eta_pred_J2=pred),
+              by = c("id", "visit", "t")) %>% 
+    left_join(pred_J1 %>% select(id, visit, t, pred) %>% rename(eta_pred_J1=pred),
+             by = c("id", "visit", "t")) 
 
   pred_list_allM_ref[[m]] <- pred_df_m
   
@@ -305,6 +317,7 @@ for(m in 1:M){
 
 ## If use cross design (id_visit), then cannot predict unobserved track
 ## fixed = Y ~ t+I(t^2), random = ~ t + I(t^2) | id_visit, takes about 3 minutes? 
+## ns(df=2) is the same
 
 ## it does not seem to handle nested models very well
 ## can't predict unobserved visits
@@ -314,19 +327,23 @@ mean(fit_time_vec_ref) # 0.6 minutes each simulation
 mean(pred_time_vec_ref) # 0.0115 minutes each simulation
 
 # check
-pred_list_allM_ref[[1]] %>% #head()
+pred_list_allM_ref[[100]] %>% #head()
 #pred_df_m %>% 
   filter(id %in% sample(101:200, 4)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>%
   ggplot()+
   geom_line(aes(x=t, y=eta, col = "True"))+
+  geom_line(aes(x=t, y=eta_pred_J1, col = "J1"), linetype = "dashed", alpha = 0.5)+
   geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed", alpha = 0.5)+
   geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed", alpha = 0.5)+
   # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   facet_grid(rows = vars(id), cols = vars(visit))
 
+sum(is.na(pred_df_m$eta_pred_J3))
+
+pred_df_m %>% filter(visit==3)
 
 save(fit_time_vec_ref, pred_time_vec_ref, pred_list_allM_ref, 
      file = here("Data/SimOutput/SimOutput_J200_ref.RData"))
