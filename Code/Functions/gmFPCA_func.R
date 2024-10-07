@@ -16,7 +16,7 @@
 # Note: this functions can only deal with regularly measured data
 #       I plan to modify this to accomodate irregular data as well
 
-gm_FPCA <- function(data, bin_w=10, L=4){
+gm_FPCA <- function(data, bin_w=10, L=4, scores=F){
   
   
   # other parameters
@@ -44,6 +44,7 @@ gm_FPCA <- function(data, bin_w=10, L=4){
   # Step 2
   print("Step 2: local GLMM")
   df_s2 <- data %>% 
+    filter(complete.cases(.)) %>% ## make it accommodate missing values
     group_by(bin) %>%
     group_map(~{
       fit_local <- glmer(Y~1+(1|id)+(1|id:visit), data = .x, 
@@ -117,11 +118,24 @@ gm_FPCA <- function(data, bin_w=10, L=4){
   evals2 <- evals[-c(1:L)]
   
   # population mean (scaled)
-  mu <- predict(global_glmm, type = "terms")[1:K, 1]+coef(global_glmm)[1]
+  mu <- predict(global_glmm, type = "terms")[1:K,1]
+  mu <- mu+coef(global_glmm)[1]
   
-  return(list(evals1 = evals1, evals2 = evals2,
-              mu = mu, efuncs_l1 = reeval_efunc_l1,
-              efuncs_l2 = reeval_efunc_l2))
+  # output
+  if(scores==F){
+    outlist <- list(evals1 = evals1, evals2 = evals2,
+                    mu = mu, efuncs_l1 = reeval_efunc_l1,
+                    efuncs_l2 = reeval_efunc_l2)
+  }
+  else{
+    outlist <- list(evals1 = evals1, evals2 = evals2,
+                    mu = mu, efuncs_l1 = reeval_efunc_l1,
+                    efuncs_l2 = reeval_efunc_l2,
+                    scores_l1 = fit_mfpca$scores$level1,
+                    scores_l2 = fit_mfpca$scores$level2)
+  }
+  
+  return(outlist)
   
 }
 

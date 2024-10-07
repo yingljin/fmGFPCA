@@ -236,7 +236,7 @@ pred_list_allM_ref <- list()
 data_list_allM <- data_list_allM_J200
 rm(data_list_allM_J200)
 
-# m <- 1
+ m <- 1
 # simulation
 for(m in 1:M){
   
@@ -273,7 +273,7 @@ for(m in 1:M){
   ## predict conditioning three half visits
   pred_J1 <- predict(glmm_fit, 
                      newdata = data_te %>% filter(t <= tmax),
-                     newdata2 = data_te %>% filter(t > tmax),
+                     newdata2 = data_te,
                      type_pred = "link", type = "subject_specific",
                      return_newdata = T)$newdata2
   
@@ -342,6 +342,8 @@ pred_list_allM_ref[[100]] %>% #head()
   facet_grid(rows = vars(id), cols = vars(visit))
 
 sum(is.na(pred_df_m$eta_pred_J3))
+
+
 
 pred_df_m %>% filter(visit==3)
 

@@ -28,7 +28,10 @@ load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
 
 ```
 
-# Simulation set-up
+
+# Simulation: dynamic prediction
+
+## Simulation set-up
 
 This file documents the simulation scheme of multi-level functional data. 
 
@@ -53,9 +56,9 @@ $$\phi_l(t) = \{\sqrt{2}sin(2\pi t), \sqrt2 cos(2\pi t), \sqrt2 sin (4\pi t), \s
 
 $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3, 4$$
 
-# Results
+## Results
 
-## Figure
+### Figure
 
 ```{r}
 pred_list_allM[[1]] %>%
@@ -98,7 +101,7 @@ pred_list_allM_ref[[1]] %>%
   labs(title = "GLMMadaptive")
 ```
 
-# Computation time
+### Computation time
 
 ```{r}
 # print("Computation time:")
@@ -115,7 +118,7 @@ data.frame("gmFPCA" = c(mean(fit_time_vec),
 ```
 
 
-# Integerated squared error
+### Integerated squared error
 
 - Over the entire prediction window
 
@@ -173,3 +176,12 @@ ise_gmfpca %>%
 ```
 
 For visit 3, the predictions are identical. This is not a coding error. Because prediction of the three visits are made at the same time, and the other visits are not identical. 
+
+For GLMM adaptive, it doesn't matter how much data is observed before the prediction window. The prediction stays identical. 
+
+
+# Simulation: compute missing values
+
+- No need to data spliting, just 10% of missing
+- Or perhaps, fit gmFPCA on complete data, and fill in missing data on new subjects? 
+
