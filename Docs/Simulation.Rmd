@@ -19,6 +19,7 @@ set.seed(625)
 library(tidyverse)
 library(here)
 library(kableExtra)
+theme_set(theme_minimal())
 
 load(here("Data/SimOutput/SimOutput_J200.RData"))
 load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
@@ -182,6 +183,87 @@ For GLMM adaptive, it doesn't matter how much data is observed before the predic
 
 # Simulation: compute missing values
 
-- No need to data spliting, just 10% of missing
-- Or perhaps, fit gmFPCA on complete data, and fill in missing data on new subjects? 
+- No need to data splitting. This can be done in all in-sample context.
+I can just use the score from mfpca.face model to compute missing value. 
+- 100 subjects in total. 10% percent subject, each with 50% missing. 
+- For GLMM adaptive, I was able to fit a linear model with id_visit grouping (not nested). The *predict.MixMod* function couldn't make subject-visit specific prediction. I had to extract random coefficients and calculate the prediction by hand. 
+- Also, GLMM adaptive failed one dataset (43th) due to numeric problem. 
 
+```{r load_mis_output}
+load(here("Data/SimOutput/SimOutput_miss.RData"))
+load(here("Data/SimOutput/SimOutput_miss_ref.RData"))
+```
+
+## Figure
+
+```{r}
+# unique(comp_list_allM_ref[[1]]$id)
+comp_list_allM[[1]] %>%
+  filter(id %in% c(30, 32, 37, 38)) %>% 
+  mutate_at(vars(starts_with("eta")), 
+            function(x)(exp(x)/(1+exp(x)))) %>%
+  mutate(eta=ifelse(is.na(Yobs), NA, eta),
+         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>% 
+  ggplot()+
+  geom_point(aes(x=t, y=eta, col="True"), size = 0.1, na.rm = T)+
+  geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1, 
+             na.rm = T)+
+  geom_point(aes(x=t, y=Yobs, col = "Observed"), size = 0.1,
+             na.rm = T)+
+  facet_grid(rows = vars(id), cols = vars(visit))+
+  labs(title = "gmFPCA", colour="")
+```
+```{r}
+comp_list_allM_ref[[1]] %>%
+  filter(id %in% c(30, 32, 37, 38)) %>% 
+  mutate_at(vars(starts_with("eta")), 
+            function(x)(exp(x)/(1+exp(x)))) %>%
+  mutate(eta=ifelse(is.na(Yobs), NA, eta),
+         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>% 
+  ggplot()+
+  geom_point(aes(x=t, y=eta, col="True"), size = 0.1, na.rm = T)+
+  geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1, 
+             na.rm = T)+
+  geom_point(aes(x=t, y=Yobs, col = "Observed"), size = 0.1,
+             na.rm = T)+
+  facet_grid(rows = vars(id), cols = vars(visit))+
+  labs(title = "GLMMadaptive", colour="")
+```
+
+## Computation time
+
+```{r}
+# print("Computation time:")
+data.frame("gmFPCA" = mean(comp_time_vec),
+           "GLMMadaptive" = mean(comp_time_vec_ref, na.rm=T)) %>% 
+  mutate(" " = "Time (minutes)", .before=1) %>%
+  kable(digits = 2) %>% 
+  kable_styling(full_width = F)
+```
+
+
+## Integrated squared error
+
+- Average acros all single values
+
+```{r, message=FALSE}
+ise_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>% 
+  filter(is.na(Yobs)) %>%
+  mutate(error = (eta_comp-eta)^2) %>%
+  summarise(error = mean(error))
+
+ise_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>% 
+  filter(is.na(Yobs)) %>%
+  mutate(error = (eta_comp-eta)^2) %>%
+  summarise(error = mean(error))
+```
+
+```{r}
+# print("Integrated squared error:")
+data.frame("gmFPCA" = ise_gmfpca2[1, 1], 
+           "GLMMadaptive"= ise_glmmad2[1, 1]) %>%
+  kable(digits = 2) %>% 
+  kable_styling(full_width = F)
+```
+
+In fact the missing data scenario appears a better illustration. 
