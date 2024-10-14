@@ -8,6 +8,7 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
+    self_contained: false
 ---
 
 ```{r setup, include=FALSE}
@@ -19,7 +20,11 @@ set.seed(625)
 library(tidyverse)
 library(here)
 library(kableExtra)
+library(ggpubr)
 theme_set(theme_minimal())
+
+# color
+library(RColorBrewer)
 
 load(here("Data/SimOutput/SimOutput_J200.RData"))
 load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
@@ -61,45 +66,57 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 
 ### Figure
 
-```{r}
-pred_list_allM[[1]] %>%
+```{r color_setting}
+cols <- c(brewer.pal(3, "Set2"), "#000000") # define a color palette 
+names(cols) <- c("0 full visits", "1 full visit", "2 full visits", "True")
+```
+
+```{r pred_sim, fig.width=14}
+p1 <- pred_list_allM[[1]] %>%
   filter(id %in% 101:104) %>%
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
-  geom_line(aes(x=t, y=probs, col="True"))+
-  geom_line(aes(x=t, y=eta_pred_J1, col = "No full visits"), linetype="dashed", 
+  geom_line(aes(x=t, y=probs, col="True"), linewidth=0.5)+
+  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full visits"), 
+            linetype="dashed", 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), linetype="dashed", 
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), 
+            linetype="dashed", 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), linetype="dashed", 
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), 
+            linetype="dashed", 
             na.rm = T)+
-  geom_point(aes(x=t, y=Y), size = 0.5)+
+  geom_point(aes(x=t, y=Y,  col="True"), size = 0.2)+
   facet_grid(row = vars(id), col=vars(visit))+
-  labs(title = "gmFPCA")
-```
+  scale_color_manual(values = cols)+
+  labs(title = "gmFPCA", color = "", y="", x="t")
 
 
-```{r}
-pred_list_allM_ref[[1]] %>%
+p2 <- pred_list_allM_ref[[1]] %>%
   filter(id %in% 101:104) %>%
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
-  geom_line(aes(x=t, y=eta, col="True"))+
-  geom_line(aes(x=t, y=eta_pred_J1, col = "No full visits"), linetype="dashed", 
-            na.rm = T, alpha = 0.5, linewidth = 1)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), linetype="dashed",
-            na.rm = T, alpha = 0.5, linewidth = 0.8)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visit"), linetype="dashed",
-            na.rm = T, alpha = 0.5, linewidth = 0.6)+
-  geom_point(aes(x=t, y=Y), size = 0.5)+
+  geom_line(aes(x=t, y=eta, col="True"), linewidth=0.5)+
+  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full visits"), 
+            linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 1)+
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), 
+            linetype="dashed",na.rm = T, alpha = 0.5, linewidth = 0.8)+
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), 
+            linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 0.6)+
+  geom_point(aes(x=t, y=Y, col = "True"), size = 0.2)+
   facet_grid(row = vars(id), col=vars(visit))+
-  labs(title = "GLMMadaptive")
+  scale_color_manual(values=cols)+
+  labs(title = "GLMMadaptive", col="", y="", x="t")
+
+ggarrange(p1, p2, common.legend = T)
+# ggsave(filename = here("Images/sim_pred.png"), 
+#        width=10, height = 4, bg = "white")
 ```
 
 ### Computation time
@@ -196,38 +213,46 @@ load(here("Data/SimOutput/SimOutput_miss_ref.RData"))
 
 ## Figure
 
-```{r}
-# unique(comp_list_allM_ref[[1]]$id)
-comp_list_allM[[1]] %>%
-  filter(id %in% c(30, 32, 37, 38)) %>% 
-  mutate_at(vars(starts_with("eta")), 
-            function(x)(exp(x)/(1+exp(x)))) %>%
-  mutate(eta=ifelse(is.na(Yobs), NA, eta),
-         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>% 
-  ggplot()+
-  geom_point(aes(x=t, y=eta, col="True"), size = 0.1, na.rm = T)+
-  geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1, 
-             na.rm = T)+
-  geom_point(aes(x=t, y=Yobs, col = "Observed"), size = 0.1,
-             na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(visit))+
-  labs(title = "gmFPCA", colour="")
+```{r color_setting2}
+cols <- c("#66C2A5", "#000000") # define a color palette 
+names(cols) <- c("Computed", "Observed/True")
 ```
-```{r}
-comp_list_allM_ref[[1]] %>%
+
+```{r miss_sim, fig.width=14}
+# unique(comp_list_allM_ref[[1]]$id)
+p1 <- comp_list_allM[[1]] %>%
   filter(id %in% c(30, 32, 37, 38)) %>% 
   mutate_at(vars(starts_with("eta")), 
             function(x)(exp(x)/(1+exp(x)))) %>%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
          eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>% 
   ggplot()+
-  geom_point(aes(x=t, y=eta, col="True"), size = 0.1, na.rm = T)+
+  geom_point(aes(x=t, y=eta, col="Observed/True"), size = 0.1, na.rm = T)+
   geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1, 
              na.rm = T)+
-  geom_point(aes(x=t, y=Yobs, col = "Observed"), size = 0.1,
+  geom_point(aes(x=t, y=Yobs, col = "Observed/True"), size = 0.1,
              na.rm = T)+
   facet_grid(rows = vars(id), cols = vars(visit))+
-  labs(title = "GLMMadaptive", colour="")
+  scale_color_manual(values = cols)+
+  labs(title = "gmFPCA", colour="", y="", x="t")
+
+p2 <- comp_list_allM_ref[[1]] %>%
+  filter(id %in% c(30, 32, 37, 38)) %>% 
+  mutate_at(vars(starts_with("eta")), 
+            function(x)(exp(x)/(1+exp(x)))) %>%
+  mutate(eta=ifelse(is.na(Yobs), NA, eta),
+         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>% 
+  ggplot()+
+  geom_point(aes(x=t, y=eta, col="Observed/True"), size = 0.1, na.rm = T)+
+  geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1, 
+             na.rm = T)+
+  geom_point(aes(x=t, y=Yobs, col="Observed/True"), size = 0.1,
+             na.rm = T)+
+  facet_grid(rows = vars(id), cols = vars(visit))+
+  scale_color_manual(values=cols)+
+  labs(title = "GLMMadaptive", colour="", y="", x="t")
+
+ggarrange(p1, p2, common.legend = T)
 ```
 
 ## Computation time
