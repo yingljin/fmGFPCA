@@ -50,7 +50,7 @@ add_mesh(df_exp,  x = ~x, y=~y, z = ~t1_intensity1, col = "Scan 1")
 head(df_exp)
 
 
-#### Examples of gmFPCA Step 2 ####
+#### Examples of gmFPCA  ####
 # simulated data
 load(here("Data/SimData/SimData_J200.RData"))
 
@@ -115,5 +115,65 @@ df_s2 %>% filter(id %in% 1:4 & bin %in% 1:5) %>%
 ggsave(filename = here("Images/bin_exp.png"),
        width = 14, height = 4, bg = "white")
 
-df_s2
+# step 3
+print("Step 4: re-evaluation")
+df_s3 <- df_s2 %>% select(id, visit, bin, eta_hat) %>% 
+  distinct(.) %>% 
+  pivot_wider(., names_from = bin, values_from = eta_hat) 
+
+## number of knots
+library(refund)
+nknot <- min(nrow(bin_mid)-4, 30)
+fit_mfpca <- mfpca.face(as.matrix(df_s3 %>% select(-id, -visit)),
+                        id = df_s3$id, visit = df_s3$visit, 
+                        argvals = as.vector(bin_mid$bin_mid),
+                        npc = L, knots = nknot)
+
+# step 4
+print("Step 4: re-evaluation")
+source(here("Code/Functions/ReEvalEfuncs.R"))
+## eigenfunctions:
+reeval_efunc_l1 <- reeval_efunctions(
+  knots = nrow(bin_mid)/2,
+  argvals_bin = bin_mid$bin_mid,
+  argvals = t_vec,
+  efunctions = fit_mfpca$efunctions$level1,
+  npc = ncol(fit_mfpca$efunctions$level1)
+)
+
+reeval_efunc_l2 <- reeval_efunctions(
+  knots = nrow(bin_mid)/2,
+  argvals_bin = bin_mid$bin_mid,
+  argvals = t_vec,
+  efunctions = fit_mfpca$efunctions$level2,
+  npc = ncol(fit_mfpca$efunctions$level2)
+)
+colnames(reeval_efunc_l1) <- paste0("PC", 1:L)
+colnames(reeval_efunc_l2) <- paste0("PC", 1:L)
+head(reeval_efunc_l1)
+
+# plot of PC funcitons
+cols <- c(brewer.pal(4, "Set2")) # define a color palette 
+
+p1 <- reeval_efunc_l1 %>% data.frame() %>% 
+  mutate(t = df_bin$t) %>% 
+  pivot_longer(1:4) %>%
+  ggplot()+
+  geom_line(aes(x=t, y=value, col=name))+
+  scale_color_manual(values = cols)+
+  theme_minimal()+
+  labs(title = "Subject-level PC functions", x="t", y="", color = "")
+  
+p2 <- reeval_efunc_l2 %>% data.frame() %>% 
+  mutate(t = df_bin$t) %>% 
+  pivot_longer(1:4) %>%
+  ggplot()+
+  geom_line(aes(x=t, y=value, col=name))+
+  scale_color_manual(values = cols)+
+  theme_minimal()+
+  labs(title = "Subject-visit-level PC functions", x="t", y="", color = "")
+
+ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T)
+ggsave(filename = here("Images/gmfpca_fpc.png"),
+       width = 12, height = 4, bg = "white")
   
