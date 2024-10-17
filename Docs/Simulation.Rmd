@@ -2,13 +2,16 @@
 title: "Simulation"
 author: "Ying Jin"
 date: "`r Sys.Date()`"
-output: 
+output:
   html_document:
     code_folding: hide
     toc: true
     toc_float: true
     toc_depth: 3
     self_contained: false
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -22,6 +25,7 @@ library(here)
 library(kableExtra)
 library(ggpubr)
 theme_set(theme_minimal())
+library(ROCR)
 
 # color
 library(RColorBrewer)
@@ -71,9 +75,10 @@ cols <- c(brewer.pal(3, "Set2"), "#000000") # define a color palette
 names(cols) <- c("0 full visits", "1 full visit", "2 full visits", "True")
 ```
 
-```{r pred_sim, fig.width=14}
+```{r pred_sim, fig.height=6, fig.width=6}
+rand_id <- sample(101:200, 2)
 p1 <- pred_list_allM[[1]] %>%
-  filter(id %in% 101:104) %>%
+  filter(id %in% rand_id) %>%
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
@@ -94,9 +99,8 @@ p1 <- pred_list_allM[[1]] %>%
   scale_color_manual(values = cols)+
   labs(title = "gmFPCA", color = "", y="", x="t")
 
-
 p2 <- pred_list_allM_ref[[1]] %>%
-  filter(id %in% 101:104) %>%
+  filter(id %in% rand_id) %>%
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
@@ -114,9 +118,7 @@ p2 <- pred_list_allM_ref[[1]] %>%
   scale_color_manual(values=cols)+
   labs(title = "GLMMadaptive", col="", y="", x="t")
 
-ggarrange(p1, p2, common.legend = T)
-# ggsave(filename = here("Images/sim_pred.png"), 
-#        width=10, height = 4, bg = "white")
+ggarrange(p1, p2, ncol=1, common.legend = T, legend = "bottom")
 ```
 
 ### Computation time
@@ -138,7 +140,7 @@ data.frame("gmFPCA" = c(mean(fit_time_vec),
 
 ### Integerated squared error
 
-- Over the entire prediction window
+
 
 ```{r, message=FALSE}
 ise_gmfpca <- bind_rows(pred_list_allM, .id = "iter") %>% 
@@ -157,8 +159,8 @@ ise_gmfpca <- ise_gmfpca %>% filter(window == "(0.5,1]")
 ise_gmfpca$error_J2[1] <- NA
 ise_gmfpca$error_J3[1:2] <- NA
 colnames(ise_gmfpca) <- c("Visit", "Time",
-                          "All half visits", "Full visit 1, half visit 2 and 3",
-                          "Full visit 1 and 2, half visit 3")
+                          "0 full visits", "1 full visit",
+                          "2 full visits")
 ```
 
 
@@ -179,8 +181,8 @@ ise_glmmad <- ise_glmmad %>% filter(window == "(0.5,1]")
 ise_glmmad$error_J2[1] <- NA
 ise_glmmad$error_J3[1:2] <- NA
 colnames(ise_glmmad) <- c("Visit", "Time",
-                          "All half visits", "Full visit 1, half visit 2 and 3",
-                          "Full visit 1 and 2, half visit 3")
+                          "0 full visits", "1 full visit",
+                          "2 full visits")
 ```
 
 ```{r}
@@ -189,13 +191,105 @@ ise_gmfpca %>%
   add_column(ise_glmmad[,3:5], .name_repair = "minimal") %>%
   kable(digits = 2) %>% 
   kable_styling(full_width = F) %>%
+  add_header_above(c(" " = 2, 
+                     "gmFPCA" = 3, "GLMMadaptive" = 3)) %>%
   add_header_above(c("Prediction window" = 2,
                          "Observed window" = 6))
+
 ```
 
 For visit 3, the predictions are identical. This is not a coding error. Because prediction of the three visits are made at the same time, and the other visits are not identical. 
 
 For GLMM adaptive, it doesn't matter how much data is observed before the prediction window. The prediction stays identical. 
+
+
+### AUC
+
+```{r, message=FALSE}
+auc_gmfpca <- bind_rows(pred_list_allM, .id = "iter") %>% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %>%
+  group_by(iter, id, visit, window) %>%
+  summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
+                               measure = "auc")@y.values[[1]],
+            auc_J2 = performance(prediction(eta_pred_J2, Y),
+                               measure = "auc")@y.values[[1]],
+            auc_J3 = performance(prediction(eta_pred_J3, Y),
+                               measure = "auc")@y.values[[1]]) %>% 
+  group_by(visit, window) %>%
+  summarise_at(vars(starts_with("auc_")), mean)
+
+auc_gmfpca <- auc_gmfpca %>% filter(window == "(0.5,1]")
+auc_gmfpca$auc_J2[1] <- NA
+auc_gmfpca$auc_J3[1:2] <- NA
+colnames(auc_gmfpca) <- c("Visit", "Time",
+                          "0 full visits", "1 full visit",
+                          "2 full visits")
+
+```
+
+```{r, message=FALSE}
+auc_glmmad <- bind_rows(pred_list_allM_ref, .id = "iter") %>% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %>%
+  group_by(iter, id, visit, window) %>%
+  summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
+                               measure = "auc")@y.values[[1]],
+            auc_J2 = performance(prediction(eta_pred_J2, Y),
+                               measure = "auc")@y.values[[1]],
+            auc_J3 = performance(prediction(eta_pred_J3, Y),
+                               measure = "auc")@y.values[[1]]) %>% 
+  group_by(visit, window) %>%
+  summarise_at(vars(starts_with("auc_")), mean)
+
+
+auc_glmmad <- auc_glmmad %>% filter(window == "(0.5,1]")
+auc_glmmad$auc_J2[1] <- NA
+auc_glmmad$auc_J3[1:2] <- NA
+colnames(auc_glmmad) <- c("Visit", "Time",
+                          "0 full visits", "1 full visit",
+                          "2 full visits")
+
+
+```
+
+```{r}
+auc_gmfpca %>% 
+  add_column(auc_glmmad[,3:5], .name_repair = "minimal") %>%
+  kable(digits = 3) %>% 
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" " = 2, 
+                     "gmFPCA" = 3, "GLMMadaptive" = 3)) %>%
+  add_header_above(c("Prediction window" = 2,
+                         "Observed window" = 6)) 
+
+```
+
+
+### Joint table
+
+```{r, message=FALSE}
+ise <- ise_gmfpca[,3:5] %>% 
+  add_column(ise_glmmad[,3:5], .name_repair = "minimal") %>% 
+  as.matrix()
+
+auc <- auc_gmfpca[, 3:5] %>% 
+  add_column(auc_glmmad[,3:5], .name_repair = "minimal") %>% 
+  as.matrix()
+
+df_perf <- rbind(ise, auc) %>% data.frame() %>%
+  mutate(visit = rep(1:3, 2), .before =1)
+colnames(df_perf) <- c("Visit",
+                  rep(c("No full visits", 
+                        "1 full visit", 
+                        "2 full visits"), 2))
+
+df_perf %>%
+  kable(digits = 2) %>%
+  kable_styling(full_width = F) %>%
+  add_header_above(c(" " = 1, "gmFPCA" = 3, "GLMMadaptive" = 3)) %>%
+  add_header_above(c(" " = 1, "Observed data" = 6)) %>%
+  group_rows(index = c("ISE" = 3, "AUC" = 3))
+  
+```
 
 
 # Simulation: compute missing values
@@ -218,10 +312,11 @@ cols <- c("#66C2A5", "#000000") # define a color palette
 names(cols) <- c("Computed", "Observed/True")
 ```
 
-```{r miss_sim, fig.width=14}
-# unique(comp_list_allM_ref[[1]]$id)
+```{r miss_sim, fig.width=6, fig.height=6}
+rand_id <- sample(unique(comp_list_allM_ref[[1]]$id), 2)
+
 p1 <- comp_list_allM[[1]] %>%
-  filter(id %in% c(30, 32, 37, 38)) %>% 
+  filter(id %in% rand_id) %>% 
   mutate_at(vars(starts_with("eta")), 
             function(x)(exp(x)/(1+exp(x)))) %>%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -237,7 +332,7 @@ p1 <- comp_list_allM[[1]] %>%
   labs(title = "gmFPCA", colour="", y="", x="t")
 
 p2 <- comp_list_allM_ref[[1]] %>%
-  filter(id %in% c(30, 32, 37, 38)) %>% 
+  filter(id %in% rand_id) %>% 
   mutate_at(vars(starts_with("eta")), 
             function(x)(exp(x)/(1+exp(x)))) %>%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -252,7 +347,7 @@ p2 <- comp_list_allM_ref[[1]] %>%
   scale_color_manual(values=cols)+
   labs(title = "GLMMadaptive", colour="", y="", x="t")
 
-ggarrange(p1, p2, common.legend = T)
+ggarrange(p1, p2, ncol = 1, common.legend = T, legend = "bottom")
 ```
 
 ## Computation time
@@ -292,3 +387,29 @@ data.frame("gmFPCA" = ise_gmfpca2[1, 1],
 ```
 
 In fact the missing data scenario appears a better illustration. 
+
+## AUC
+
+```{r, message=FALSE}
+auc_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>% 
+  filter(is.na(Yobs)) %>%
+  group_by(iter) %>% 
+  summarise(auc = performance(prediction(eta_comp, Y),
+                              measure = "auc")@y.values[[1]]) %>%
+  summarise(auc = mean(auc))
+
+auc_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>% 
+  filter(is.na(Yobs)) %>%
+  group_by(iter) %>% 
+  summarise(auc = performance(prediction(eta_comp, Y),
+                              measure = "auc")@y.values[[1]]) %>%
+  summarise(auc = mean(auc))
+```
+
+
+```{r}
+data.frame("gmFPCA" = auc_gmfpca2[1, 1], 
+           "GLMMadaptive"= auc_glmmad2[1, 1]) %>%
+  kable(digits = 2) %>% 
+  kable_styling(full_width = F)
+```

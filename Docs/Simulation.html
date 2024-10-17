@@ -11,7 +11,7 @@
 
 <meta name="author" content="Ying Jin" />
 
-<meta name="date" content="2024-10-14" />
+<meta name="date" content="2024-10-17" />
 
 <title>Simulation</title>
 
@@ -254,7 +254,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Simulation</h1>
 <h4 class="author">Ying Jin</h4>
-<h4 class="date">2024-10-14</h4>
+<h4 class="date">2024-10-17</h4>
 
 </div>
 
@@ -294,8 +294,9 @@ t)\}\]</span></p>
 <h3>Figure</h3>
 <pre class="r"><code>cols &lt;- c(brewer.pal(3, &quot;Set2&quot;), &quot;#000000&quot;) # define a color palette 
 names(cols) &lt;- c(&quot;0 full visits&quot;, &quot;1 full visit&quot;, &quot;2 full visits&quot;, &quot;True&quot;)</code></pre>
-<pre class="r"><code>p1 &lt;- pred_list_allM[[1]] %&gt;%
-  filter(id %in% 101:104) %&gt;%
+<pre class="r"><code>rand_id &lt;- sample(101:200, 2)
+p1 &lt;- pred_list_allM[[1]] %&gt;%
+  filter(id %in% rand_id) %&gt;%
   mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
@@ -316,9 +317,8 @@ names(cols) &lt;- c(&quot;0 full visits&quot;, &quot;1 full visit&quot;, &quot;2
   scale_color_manual(values = cols)+
   labs(title = &quot;gmFPCA&quot;, color = &quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
-
 p2 &lt;- pred_list_allM_ref[[1]] %&gt;%
-  filter(id %in% 101:104) %&gt;%
+  filter(id %in% rand_id) %&gt;%
   mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
          eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
          eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
@@ -336,10 +336,8 @@ p2 &lt;- pred_list_allM_ref[[1]] %&gt;%
   scale_color_manual(values=cols)+
   labs(title = &quot;GLMMadaptive&quot;, col=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
-ggarrange(p1, p2, common.legend = T)</code></pre>
-<p><img src="Simulation_files/figure-html/pred_sim-1.png" width="1344" /></p>
-<pre class="r"><code># ggsave(filename = here(&quot;Images/sim_pred.png&quot;), 
-#        width=10, height = 4, bg = &quot;white&quot;)</code></pre>
+ggarrange(p1, p2, ncol=1, common.legend = T, legend = &quot;bottom&quot;)</code></pre>
+<p><img src="Simulation_files/figure-html/pred_sim-1.png" width="576" /></p>
 </div>
 <div id="computation-time" class="section level3">
 <h3>Computation time</h3>
@@ -393,9 +391,6 @@ Prediction
 </div>
 <div id="integerated-squared-error" class="section level3">
 <h3>Integerated squared error</h3>
-<ul>
-<li>Over the entire prediction window</li>
-</ul>
 <pre class="r"><code>ise_gmfpca &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;% 
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   mutate(error_J1 = (eta_pred_J1-eta)^2,
@@ -412,8 +407,8 @@ ise_gmfpca &lt;- ise_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
 ise_gmfpca$error_J2[1] &lt;- NA
 ise_gmfpca$error_J3[1:2] &lt;- NA
 colnames(ise_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;All half visits&quot;, &quot;Full visit 1, half visit 2 and 3&quot;,
-                          &quot;Full visit 1 and 2, half visit 3&quot;)</code></pre>
+                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visits&quot;)</code></pre>
 <pre class="r"><code>ise_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   mutate(error_J1 = (eta_pred_J1-eta)^2,
@@ -430,13 +425,15 @@ ise_glmmad &lt;- ise_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
 ise_glmmad$error_J2[1] &lt;- NA
 ise_glmmad$error_J3[1:2] &lt;- NA
 colnames(ise_glmmad) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;All half visits&quot;, &quot;Full visit 1, half visit 2 and 3&quot;,
-                          &quot;Full visit 1 and 2, half visit 3&quot;)</code></pre>
+                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visits&quot;)</code></pre>
 <pre class="r"><code># print(&quot;Integrated squared error:&quot;)
 ise_gmfpca %&gt;% 
   add_column(ise_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
   kable(digits = 2) %&gt;% 
   kable_styling(full_width = F) %&gt;%
+  add_header_above(c(&quot; &quot; = 2, 
+                     &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
   add_header_above(c(&quot;Prediction window&quot; = 2,
                          &quot;Observed window&quot; = 6))</code></pre>
 <table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
@@ -454,6 +451,20 @@ Observed window
 </th>
 </tr>
 <tr>
+<th style="empty-cells: hide;border-bottom:hidden;" colspan="2">
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+gmFPCA
+</div>
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+GLMMadaptive
+</div>
+</th>
+</tr>
+<tr>
 <th style="text-align:left;">
 Visit
 </th>
@@ -461,22 +472,22 @@ Visit
 Time
 </th>
 <th style="text-align:right;">
-All half visits
+0 full visits
 </th>
 <th style="text-align:right;">
-Full visit 1, half visit 2 and 3
+1 full visit
 </th>
 <th style="text-align:right;">
-Full visit 1 and 2, half visit 3
+2 full visits
 </th>
 <th style="text-align:right;">
-All half visits
+0 full visits
 </th>
 <th style="text-align:right;">
-Full visit 1, half visit 2 and 3
+1 full visit
 </th>
 <th style="text-align:right;">
-Full visit 1 and 2, half visit 3
+2 full visits
 </th>
 </tr>
 </thead>
@@ -561,6 +572,396 @@ and the other visits are not identical.</p>
 <p>For GLMM adaptive, it doesn’t matter how much data is observed before
 the prediction window. The prediction stays identical.</p>
 </div>
+<div id="auc" class="section level3">
+<h3>AUC</h3>
+<pre class="r"><code>auc_gmfpca &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
+  group_by(iter, id, visit, window) %&gt;%
+  summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]],
+            auc_J2 = performance(prediction(eta_pred_J2, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]],
+            auc_J3 = performance(prediction(eta_pred_J3, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;% 
+  group_by(visit, window) %&gt;%
+  summarise_at(vars(starts_with(&quot;auc_&quot;)), mean)
+
+auc_gmfpca &lt;- auc_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
+auc_gmfpca$auc_J2[1] &lt;- NA
+auc_gmfpca$auc_J3[1:2] &lt;- NA
+colnames(auc_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visits&quot;)</code></pre>
+<pre class="r"><code>auc_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
+  mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
+  group_by(iter, id, visit, window) %&gt;%
+  summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]],
+            auc_J2 = performance(prediction(eta_pred_J2, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]],
+            auc_J3 = performance(prediction(eta_pred_J3, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;% 
+  group_by(visit, window) %&gt;%
+  summarise_at(vars(starts_with(&quot;auc_&quot;)), mean)
+
+
+auc_glmmad &lt;- auc_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
+auc_glmmad$auc_J2[1] &lt;- NA
+auc_glmmad$auc_J3[1:2] &lt;- NA
+colnames(auc_glmmad) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visits&quot;)</code></pre>
+<pre class="r"><code>auc_gmfpca %&gt;% 
+  add_column(auc_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
+  kable(digits = 3) %&gt;% 
+  kable_styling(full_width = F) %&gt;%
+  add_header_above(c(&quot; &quot; = 2, 
+                     &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
+  add_header_above(c(&quot;Prediction window&quot; = 2,
+                         &quot;Observed window&quot; = 6)) </code></pre>
+<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Prediction window
+</div>
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="6">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Observed window
+</div>
+</th>
+</tr>
+<tr>
+<th style="empty-cells: hide;border-bottom:hidden;" colspan="2">
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+gmFPCA
+</div>
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+GLMMadaptive
+</div>
+</th>
+</tr>
+<tr>
+<th style="text-align:left;">
+Visit
+</th>
+<th style="text-align:left;">
+Time
+</th>
+<th style="text-align:right;">
+0 full visits
+</th>
+<th style="text-align:right;">
+1 full visit
+</th>
+<th style="text-align:right;">
+2 full visits
+</th>
+<th style="text-align:right;">
+0 full visits
+</th>
+<th style="text-align:right;">
+1 full visit
+</th>
+<th style="text-align:right;">
+2 full visits
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:left;">
+(0.5,1]
+</td>
+<td style="text-align:right;">
+0.705
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+0.534
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2
+</td>
+<td style="text-align:left;">
+(0.5,1]
+</td>
+<td style="text-align:right;">
+0.705
+</td>
+<td style="text-align:right;">
+0.750
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+0.537
+</td>
+<td style="text-align:right;">
+0.537
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+3
+</td>
+<td style="text-align:left;">
+(0.5,1]
+</td>
+<td style="text-align:right;">
+0.705
+</td>
+<td style="text-align:right;">
+0.749
+</td>
+<td style="text-align:right;">
+0.756
+</td>
+<td style="text-align:right;">
+0.533
+</td>
+<td style="text-align:right;">
+0.533
+</td>
+<td style="text-align:right;">
+0.533
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="joint-table" class="section level3">
+<h3>Joint table</h3>
+<pre class="r"><code>ise &lt;- ise_gmfpca[,3:5] %&gt;% 
+  add_column(ise_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;% 
+  as.matrix()
+
+auc &lt;- auc_gmfpca[, 3:5] %&gt;% 
+  add_column(auc_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;% 
+  as.matrix()
+
+df_perf &lt;- rbind(ise, auc) %&gt;% data.frame() %&gt;%
+  mutate(visit = rep(1:3, 2), .before =1)
+colnames(df_perf) &lt;- c(&quot;Visit&quot;,
+                  rep(c(&quot;No full visits&quot;, 
+                        &quot;1 full visit&quot;, 
+                        &quot;2 full visits&quot;), 2))
+
+df_perf %&gt;%
+  kable(digits = 2) %&gt;%
+  kable_styling(full_width = F) %&gt;%
+  add_header_above(c(&quot; &quot; = 1, &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
+  add_header_above(c(&quot; &quot; = 1, &quot;Observed data&quot; = 6)) %&gt;%
+  group_rows(index = c(&quot;ISE&quot; = 3, &quot;AUC&quot; = 3))</code></pre>
+<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="empty-cells: hide;border-bottom:hidden;" colspan="1">
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="6">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Observed data
+</div>
+</th>
+</tr>
+<tr>
+<th style="empty-cells: hide;border-bottom:hidden;" colspan="1">
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+gmFPCA
+</div>
+</th>
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+GLMMadaptive
+</div>
+</th>
+</tr>
+<tr>
+<th style="text-align:right;">
+Visit
+</th>
+<th style="text-align:right;">
+No full visits
+</th>
+<th style="text-align:right;">
+1 full visit
+</th>
+<th style="text-align:right;">
+2 full visits
+</th>
+<th style="text-align:right;">
+No full visits
+</th>
+<th style="text-align:right;">
+1 full visit
+</th>
+<th style="text-align:right;">
+2 full visits
+</th>
+</tr>
+</thead>
+<tbody>
+<tr grouplength="3">
+<td colspan="7" style="border-bottom: 1px solid;">
+<strong>ISE</strong>
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+1
+</td>
+<td style="text-align:right;">
+163.94
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+343.28
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+2
+</td>
+<td style="text-align:right;">
+164.23
+</td>
+<td style="text-align:right;">
+107.93
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+340.96
+</td>
+<td style="text-align:right;">
+340.96
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+3
+</td>
+<td style="text-align:right;">
+165.96
+</td>
+<td style="text-align:right;">
+109.51
+</td>
+<td style="text-align:right;">
+98.75
+</td>
+<td style="text-align:right;">
+345.81
+</td>
+<td style="text-align:right;">
+345.81
+</td>
+<td style="text-align:right;">
+345.81
+</td>
+</tr>
+<tr grouplength="3">
+<td colspan="7" style="border-bottom: 1px solid;">
+<strong>AUC</strong>
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+1
+</td>
+<td style="text-align:right;">
+0.71
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+0.53
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+2
+</td>
+<td style="text-align:right;">
+0.70
+</td>
+<td style="text-align:right;">
+0.75
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+0.54
+</td>
+<td style="text-align:right;">
+0.54
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+3
+</td>
+<td style="text-align:right;">
+0.71
+</td>
+<td style="text-align:right;">
+0.75
+</td>
+<td style="text-align:right;">
+0.76
+</td>
+<td style="text-align:right;">
+0.53
+</td>
+<td style="text-align:right;">
+0.53
+</td>
+<td style="text-align:right;">
+0.53
+</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 </div>
 <div id="simulation-compute-missing-values" class="section level1">
@@ -584,9 +985,10 @@ load(here(&quot;Data/SimOutput/SimOutput_miss_ref.RData&quot;))</code></pre>
 <h2>Figure</h2>
 <pre class="r"><code>cols &lt;- c(&quot;#66C2A5&quot;, &quot;#000000&quot;) # define a color palette 
 names(cols) &lt;- c(&quot;Computed&quot;, &quot;Observed/True&quot;)</code></pre>
-<pre class="r"><code># unique(comp_list_allM_ref[[1]]$id)
+<pre class="r"><code>rand_id &lt;- sample(unique(comp_list_allM_ref[[1]]$id), 2)
+
 p1 &lt;- comp_list_allM[[1]] %&gt;%
-  filter(id %in% c(30, 32, 37, 38)) %&gt;% 
+  filter(id %in% rand_id) %&gt;% 
   mutate_at(vars(starts_with(&quot;eta&quot;)), 
             function(x)(exp(x)/(1+exp(x)))) %&gt;%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -602,7 +1004,7 @@ p1 &lt;- comp_list_allM[[1]] %&gt;%
   labs(title = &quot;gmFPCA&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
 p2 &lt;- comp_list_allM_ref[[1]] %&gt;%
-  filter(id %in% c(30, 32, 37, 38)) %&gt;% 
+  filter(id %in% rand_id) %&gt;% 
   mutate_at(vars(starts_with(&quot;eta&quot;)), 
             function(x)(exp(x)/(1+exp(x)))) %&gt;%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -617,8 +1019,8 @@ p2 &lt;- comp_list_allM_ref[[1]] %&gt;%
   scale_color_manual(values=cols)+
   labs(title = &quot;GLMMadaptive&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
-ggarrange(p1, p2, common.legend = T)</code></pre>
-<p><img src="Simulation_files/figure-html/miss_sim-1.png" width="1344" /></p>
+ggarrange(p1, p2, ncol = 1, common.legend = T, legend = &quot;bottom&quot;)</code></pre>
+<p><img src="Simulation_files/figure-html/miss_sim-1.png" width="576" /></p>
 </div>
 <div id="computation-time-1" class="section level2">
 <h2>Computation time</h2>
@@ -698,6 +1100,48 @@ GLMMadaptive
 </tbody>
 </table>
 <p>In fact the missing data scenario appears a better illustration.</p>
+</div>
+<div id="auc-1" class="section level2">
+<h2>AUC</h2>
+<pre class="r"><code>auc_gmfpca2 &lt;- bind_rows(comp_list_allM, .id = &quot;iter&quot;) %&gt;% 
+  filter(is.na(Yobs)) %&gt;%
+  group_by(iter) %&gt;% 
+  summarise(auc = performance(prediction(eta_comp, Y),
+                              measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
+  summarise(auc = mean(auc))
+
+auc_glmmad2 &lt;- bind_rows(comp_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
+  filter(is.na(Yobs)) %&gt;%
+  group_by(iter) %&gt;% 
+  summarise(auc = performance(prediction(eta_comp, Y),
+                              measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
+  summarise(auc = mean(auc))</code></pre>
+<pre class="r"><code>data.frame(&quot;gmFPCA&quot; = auc_gmfpca2[1, 1], 
+           &quot;GLMMadaptive&quot;= auc_glmmad2[1, 1]) %&gt;%
+  kable(digits = 2) %&gt;% 
+  kable_styling(full_width = F)</code></pre>
+<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:right;">
+auc
+</th>
+<th style="text-align:right;">
+auc.1
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+0.82
+</td>
+<td style="text-align:right;">
+0.65
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 
