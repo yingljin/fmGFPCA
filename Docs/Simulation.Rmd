@@ -46,9 +46,9 @@ load(here("Data/SimOutput/SimOutput_J200_ref.RData"))
 This file documents the simulation scheme of multi-level functional data. 
 
 - Sample size: training = 100, test = 100
-- Number of visits J = 3
+- Number of series J = 3
 - Number of observations at each vitis K = 200 (when K = 100, numeric issues are likely to happen)
-- Make prediction with observations until the middle of visit 2 and 3 separately
+- Make prediction with observations until the middle of series 2 and 3 separately
 - 100 simulations
 
 
@@ -72,49 +72,51 @@ $$\xi_{il} \sim N(0, \lambda_l), \hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3,
 
 ```{r color_setting}
 cols <- c(brewer.pal(3, "Set2"), "#000000") # define a color palette 
-names(cols) <- c("0 full visits", "1 full visit", "2 full visits", "True")
+names(cols) <- c("0 full series", "1 full series", "2 full series", "True")
 ```
 
 ```{r pred_sim, fig.height=6, fig.width=6}
 rand_id <- sample(101:200, 2)
 p1 <- pred_list_allM[[1]] %>%
   filter(id %in% rand_id) %>%
+  rename(series = visit) %>% 
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
+         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 & t<=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
   geom_line(aes(x=t, y=probs, col="True"), linewidth=0.5)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full visits"), 
+  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full series"), 
             linetype="dashed", 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), 
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full series"), 
             linetype="dashed", 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), 
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full series"), 
             linetype="dashed", 
             na.rm = T)+
   geom_point(aes(x=t, y=Y,  col="True"), size = 0.2)+
-  facet_grid(row = vars(id), col=vars(visit))+
+  facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values = cols)+
   labs(title = "gmFPCA", color = "", y="", x="t")
 
 p2 <- pred_list_allM_ref[[1]] %>%
   filter(id %in% rand_id) %>%
+  rename(series = visit) %>% 
   mutate(eta_pred_J1 = ifelse(t<=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 & t<=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&t<=0.5), NA, eta_pred_J3)) %>%
+         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 & t<=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
   geom_line(aes(x=t, y=eta, col="True"), linewidth=0.5)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full visits"), 
+  geom_line(aes(x=t, y=eta_pred_J1, col = "0 full series"), 
             linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 1)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full visit"), 
+  geom_line(aes(x=t, y=eta_pred_J2, col = "1 full series"), 
             linetype="dashed",na.rm = T, alpha = 0.5, linewidth = 0.8)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full visits"), 
+  geom_line(aes(x=t, y=eta_pred_J3, col = "2 full series"), 
             linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 0.6)+
   geom_point(aes(x=t, y=Y, col = "True"), size = 0.2)+
-  facet_grid(row = vars(id), col=vars(visit))+
+  facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values=cols)+
   labs(title = "GLMMadaptive", col="", y="", x="t")
 
@@ -158,9 +160,9 @@ ise_gmfpca <- bind_rows(pred_list_allM, .id = "iter") %>%
 ise_gmfpca <- ise_gmfpca %>% filter(window == "(0.5,1]")
 ise_gmfpca$error_J2[1] <- NA
 ise_gmfpca$error_J3[1:2] <- NA
-colnames(ise_gmfpca) <- c("Visit", "Time",
-                          "0 full visits", "1 full visit",
-                          "2 full visits")
+colnames(ise_gmfpca) <- c("visit", "Time",
+                          "0 full visit", "1 full visit",
+                          "2 full visit")
 ```
 
 
@@ -180,9 +182,9 @@ ise_glmmad <- bind_rows(pred_list_allM_ref, .id = "iter") %>%
 ise_glmmad <- ise_glmmad %>% filter(window == "(0.5,1]")
 ise_glmmad$error_J2[1] <- NA
 ise_glmmad$error_J3[1:2] <- NA
-colnames(ise_glmmad) <- c("Visit", "Time",
-                          "0 full visits", "1 full visit",
-                          "2 full visits")
+colnames(ise_glmmad) <- c("visit", "Time",
+                          "0 full visit", "1 full visit",
+                          "2 full visit")
 ```
 
 ```{r}
@@ -198,7 +200,7 @@ ise_gmfpca %>%
 
 ```
 
-For visit 3, the predictions are identical. This is not a coding error. Because prediction of the three visits are made at the same time, and the other visits are not identical. 
+For series 3, the predictions are identical. This is not a coding error. Because prediction of the three series are made at the same time, and the other series are not identical. 
 
 For GLMM adaptive, it doesn't matter how much data is observed before the prediction window. The prediction stays identical. 
 
@@ -221,9 +223,9 @@ auc_gmfpca <- bind_rows(pred_list_allM, .id = "iter") %>%
 auc_gmfpca <- auc_gmfpca %>% filter(window == "(0.5,1]")
 auc_gmfpca$auc_J2[1] <- NA
 auc_gmfpca$auc_J3[1:2] <- NA
-colnames(auc_gmfpca) <- c("Visit", "Time",
-                          "0 full visits", "1 full visit",
-                          "2 full visits")
+colnames(auc_gmfpca) <- c("visit", "Time",
+                          "0 full visit", "1 full visit",
+                          "2 full visit")
 
 ```
 
@@ -244,9 +246,9 @@ auc_glmmad <- bind_rows(pred_list_allM_ref, .id = "iter") %>%
 auc_glmmad <- auc_glmmad %>% filter(window == "(0.5,1]")
 auc_glmmad$auc_J2[1] <- NA
 auc_glmmad$auc_J3[1:2] <- NA
-colnames(auc_glmmad) <- c("Visit", "Time",
-                          "0 full visits", "1 full visit",
-                          "2 full visits")
+colnames(auc_glmmad) <- c("visit", "Time",
+                          "0 full visit", "1 full visit",
+                          "2 full visit")
 
 
 ```
@@ -277,10 +279,10 @@ auc <- auc_gmfpca[, 3:5] %>%
 
 df_perf <- rbind(ise, auc) %>% data.frame() %>%
   mutate(visit = rep(1:3, 2), .before =1)
-colnames(df_perf) <- c("Visit",
-                  rep(c("No full visits", 
+colnames(df_perf) <- c("visit",
+                  rep(c("No full visit", 
                         "1 full visit", 
-                        "2 full visits"), 2))
+                        "2 full visit"), 2))
 
 df_perf %>%
   kable(digits = 2) %>%
@@ -297,7 +299,7 @@ df_perf %>%
 - No need to data splitting. This can be done in all in-sample context.
 I can just use the score from mfpca.face model to compute missing value. 
 - 100 subjects in total. 10% percent subject, each with 50% missing. 
-- For GLMM adaptive, I was able to fit a linear model with id_visit grouping (not nested). The *predict.MixMod* function couldn't make subject-visit specific prediction. I had to extract random coefficients and calculate the prediction by hand. 
+- For GLMM adaptive, I was able to fit a linear model with id_visit grouping (not nested). The *predict.MixMod* function couldn't make subject-series specific prediction. I had to extract random coefficients and calculate the prediction by hand. 
 - Also, GLMM adaptive failed one dataset (43th) due to numeric problem. 
 
 ```{r load_mis_output}
@@ -316,7 +318,8 @@ names(cols) <- c("Computed", "Observed/True")
 rand_id <- sample(unique(comp_list_allM_ref[[1]]$id), 2)
 
 p1 <- comp_list_allM[[1]] %>%
-  filter(id %in% rand_id) %>% 
+  filter(id %in% rand_id) %>%
+  rename(series = visit) %>%
   mutate_at(vars(starts_with("eta")), 
             function(x)(exp(x)/(1+exp(x)))) %>%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -327,12 +330,13 @@ p1 <- comp_list_allM[[1]] %>%
              na.rm = T)+
   geom_point(aes(x=t, y=Yobs, col = "Observed/True"), size = 0.1,
              na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(visit))+
+  facet_grid(rows = vars(id), cols = vars(series))+
   scale_color_manual(values = cols)+
   labs(title = "gmFPCA", colour="", y="", x="t")
 
 p2 <- comp_list_allM_ref[[1]] %>%
   filter(id %in% rand_id) %>% 
+  rename(series = visit) %>%
   mutate_at(vars(starts_with("eta")), 
             function(x)(exp(x)/(1+exp(x)))) %>%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -343,7 +347,7 @@ p2 <- comp_list_allM_ref[[1]] %>%
              na.rm = T)+
   geom_point(aes(x=t, y=Yobs, col="Observed/True"), size = 0.1,
              na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(visit))+
+  facet_grid(rows = vars(id), cols = vars(series))+
   scale_color_manual(values=cols)+
   labs(title = "GLMMadaptive", colour="", y="", x="t")
 
@@ -370,11 +374,17 @@ data.frame("gmFPCA" = mean(comp_time_vec),
 ise_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>% 
   filter(is.na(Yobs)) %>%
   mutate(error = (eta_comp-eta)^2) %>%
+  group_by(iter, id) %>% 
+  summarize(error = sum(error)) %>%
+  ungroup() %>%
   summarise(error = mean(error))
 
 ise_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>% 
   filter(is.na(Yobs)) %>%
   mutate(error = (eta_comp-eta)^2) %>%
+  group_by(iter, id) %>% 
+  summarize(error = sum(error)) %>%
+  ungroup() %>%
   summarise(error = mean(error))
 ```
 
@@ -393,16 +403,18 @@ In fact the missing data scenario appears a better illustration.
 ```{r, message=FALSE}
 auc_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>% 
   filter(is.na(Yobs)) %>%
-  group_by(iter) %>% 
+  group_by(iter, id) %>% 
   summarise(auc = performance(prediction(eta_comp, Y),
                               measure = "auc")@y.values[[1]]) %>%
+  ungroup() %>%
   summarise(auc = mean(auc))
 
 auc_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>% 
   filter(is.na(Yobs)) %>%
-  group_by(iter) %>% 
+  group_by(iter, id) %>% 
   summarise(auc = performance(prediction(eta_comp, Y),
                               measure = "auc")@y.values[[1]]) %>%
+  ungroup() %>%
   summarise(auc = mean(auc))
 ```
 

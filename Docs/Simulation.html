@@ -11,7 +11,7 @@
 
 <meta name="author" content="Ying Jin" />
 
-<meta name="date" content="2024-10-17" />
+<meta name="date" content="2024-10-19" />
 
 <title>Simulation</title>
 
@@ -254,7 +254,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Simulation</h1>
 <h4 class="author">Ying Jin</h4>
-<h4 class="date">2024-10-17</h4>
+<h4 class="date">2024-10-19</h4>
 
 </div>
 
@@ -267,11 +267,11 @@ div.tocify {
 data.</p>
 <ul>
 <li><p>Sample size: training = 100, test = 100</p></li>
-<li><p>Number of visits J = 3</p></li>
+<li><p>Number of series J = 3</p></li>
 <li><p>Number of observations at each vitis K = 200 (when K = 100,
 numeric issues are likely to happen)</p></li>
-<li><p>Make prediction with observations until the middle of visit 2 and
-3 separately</p></li>
+<li><p>Make prediction with observations until the middle of series 2
+and 3 separately</p></li>
 <li><p>100 simulations</p></li>
 <li><p>Binary outcomes:</p></li>
 </ul>
@@ -293,46 +293,48 @@ t)\}\]</span></p>
 <div id="figure" class="section level3">
 <h3>Figure</h3>
 <pre class="r"><code>cols &lt;- c(brewer.pal(3, &quot;Set2&quot;), &quot;#000000&quot;) # define a color palette 
-names(cols) &lt;- c(&quot;0 full visits&quot;, &quot;1 full visit&quot;, &quot;2 full visits&quot;, &quot;True&quot;)</code></pre>
+names(cols) &lt;- c(&quot;0 full series&quot;, &quot;1 full series&quot;, &quot;2 full series&quot;, &quot;True&quot;)</code></pre>
 <pre class="r"><code>rand_id &lt;- sample(101:200, 2)
 p1 &lt;- pred_list_allM[[1]] %&gt;%
   filter(id %in% rand_id) %&gt;%
+  rename(series = visit) %&gt;% 
   mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
+         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
   mutate_at(vars(starts_with(&quot;eta_pred&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
   ggplot()+
   geom_line(aes(x=t, y=probs, col=&quot;True&quot;), linewidth=0.5)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full visits&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
             linetype=&quot;dashed&quot;, 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full visit&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
             linetype=&quot;dashed&quot;, 
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full visits&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
             linetype=&quot;dashed&quot;, 
             na.rm = T)+
   geom_point(aes(x=t, y=Y,  col=&quot;True&quot;), size = 0.2)+
-  facet_grid(row = vars(id), col=vars(visit))+
+  facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values = cols)+
   labs(title = &quot;gmFPCA&quot;, color = &quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
 p2 &lt;- pred_list_allM_ref[[1]] %&gt;%
   filter(id %in% rand_id) %&gt;%
+  rename(series = visit) %&gt;% 
   mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(visit==1|(visit %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(visit %in% 1:2|(visit==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
+         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
+         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
   mutate_at(vars(starts_with(&quot;eta&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
   ggplot()+
   geom_line(aes(x=t, y=eta, col=&quot;True&quot;), linewidth=0.5)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full visits&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
             linetype=&quot;dashed&quot;, na.rm = T, alpha = 0.5, linewidth = 1)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full visit&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
             linetype=&quot;dashed&quot;,na.rm = T, alpha = 0.5, linewidth = 0.8)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full visits&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
             linetype=&quot;dashed&quot;, na.rm = T, alpha = 0.5, linewidth = 0.6)+
   geom_point(aes(x=t, y=Y, col = &quot;True&quot;), size = 0.2)+
-  facet_grid(row = vars(id), col=vars(visit))+
+  facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values=cols)+
   labs(title = &quot;GLMMadaptive&quot;, col=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
@@ -406,9 +408,9 @@ Prediction
 ise_gmfpca &lt;- ise_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
 ise_gmfpca$error_J2[1] &lt;- NA
 ise_gmfpca$error_J3[1:2] &lt;- NA
-colnames(ise_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visits&quot;)</code></pre>
+colnames(ise_gmfpca) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visit&quot;)</code></pre>
 <pre class="r"><code>ise_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   mutate(error_J1 = (eta_pred_J1-eta)^2,
@@ -424,9 +426,9 @@ colnames(ise_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
 ise_glmmad &lt;- ise_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
 ise_glmmad$error_J2[1] &lt;- NA
 ise_glmmad$error_J3[1:2] &lt;- NA
-colnames(ise_glmmad) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visits&quot;)</code></pre>
+colnames(ise_glmmad) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visit&quot;)</code></pre>
 <pre class="r"><code># print(&quot;Integrated squared error:&quot;)
 ise_gmfpca %&gt;% 
   add_column(ise_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
@@ -466,28 +468,28 @@ GLMMadaptive
 </tr>
 <tr>
 <th style="text-align:left;">
-Visit
+visit
 </th>
 <th style="text-align:left;">
 Time
 </th>
 <th style="text-align:right;">
-0 full visits
+0 full visit
 </th>
 <th style="text-align:right;">
 1 full visit
 </th>
 <th style="text-align:right;">
-2 full visits
+2 full visit
 </th>
 <th style="text-align:right;">
-0 full visits
+0 full visit
 </th>
 <th style="text-align:right;">
 1 full visit
 </th>
 <th style="text-align:right;">
-2 full visits
+2 full visit
 </th>
 </tr>
 </thead>
@@ -566,9 +568,9 @@ Time
 </tr>
 </tbody>
 </table>
-<p>For visit 3, the predictions are identical. This is not a coding
-error. Because prediction of the three visits are made at the same time,
-and the other visits are not identical.</p>
+<p>For series 3, the predictions are identical. This is not a coding
+error. Because prediction of the three series are made at the same time,
+and the other series are not identical.</p>
 <p>For GLMM adaptive, it doesn’t matter how much data is observed before
 the prediction window. The prediction stays identical.</p>
 </div>
@@ -589,9 +591,9 @@ the prediction window. The prediction stays identical.</p>
 auc_gmfpca &lt;- auc_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
 auc_gmfpca$auc_J2[1] &lt;- NA
 auc_gmfpca$auc_J3[1:2] &lt;- NA
-colnames(auc_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visits&quot;)</code></pre>
+colnames(auc_gmfpca) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visit&quot;)</code></pre>
 <pre class="r"><code>auc_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   group_by(iter, id, visit, window) %&gt;%
@@ -608,9 +610,9 @@ colnames(auc_gmfpca) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
 auc_glmmad &lt;- auc_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
 auc_glmmad$auc_J2[1] &lt;- NA
 auc_glmmad$auc_J3[1:2] &lt;- NA
-colnames(auc_glmmad) &lt;- c(&quot;Visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visits&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visits&quot;)</code></pre>
+colnames(auc_glmmad) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
+                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
+                          &quot;2 full visit&quot;)</code></pre>
 <pre class="r"><code>auc_gmfpca %&gt;% 
   add_column(auc_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
   kable(digits = 3) %&gt;% 
@@ -649,28 +651,28 @@ GLMMadaptive
 </tr>
 <tr>
 <th style="text-align:left;">
-Visit
+visit
 </th>
 <th style="text-align:left;">
 Time
 </th>
 <th style="text-align:right;">
-0 full visits
+0 full visit
 </th>
 <th style="text-align:right;">
 1 full visit
 </th>
 <th style="text-align:right;">
-2 full visits
+2 full visit
 </th>
 <th style="text-align:right;">
-0 full visits
+0 full visit
 </th>
 <th style="text-align:right;">
 1 full visit
 </th>
 <th style="text-align:right;">
-2 full visits
+2 full visit
 </th>
 </tr>
 </thead>
@@ -762,10 +764,10 @@ auc &lt;- auc_gmfpca[, 3:5] %&gt;%
 
 df_perf &lt;- rbind(ise, auc) %&gt;% data.frame() %&gt;%
   mutate(visit = rep(1:3, 2), .before =1)
-colnames(df_perf) &lt;- c(&quot;Visit&quot;,
-                  rep(c(&quot;No full visits&quot;, 
+colnames(df_perf) &lt;- c(&quot;visit&quot;,
+                  rep(c(&quot;No full visit&quot;, 
                         &quot;1 full visit&quot;, 
-                        &quot;2 full visits&quot;), 2))
+                        &quot;2 full visit&quot;), 2))
 
 df_perf %&gt;%
   kable(digits = 2) %&gt;%
@@ -800,25 +802,25 @@ GLMMadaptive
 </tr>
 <tr>
 <th style="text-align:right;">
-Visit
+visit
 </th>
 <th style="text-align:right;">
-No full visits
-</th>
-<th style="text-align:right;">
-1 full visit
-</th>
-<th style="text-align:right;">
-2 full visits
-</th>
-<th style="text-align:right;">
-No full visits
+No full visit
 </th>
 <th style="text-align:right;">
 1 full visit
 </th>
 <th style="text-align:right;">
-2 full visits
+2 full visit
+</th>
+<th style="text-align:right;">
+No full visit
+</th>
+<th style="text-align:right;">
+1 full visit
+</th>
+<th style="text-align:right;">
+2 full visit
 </th>
 </tr>
 </thead>
@@ -974,7 +976,7 @@ missing value.</li>
 missing.</li>
 <li>For GLMM adaptive, I was able to fit a linear model with id_visit
 grouping (not nested). The <em>predict.MixMod</em> function couldn’t
-make subject-visit specific prediction. I had to extract random
+make subject-series specific prediction. I had to extract random
 coefficients and calculate the prediction by hand.</li>
 <li>Also, GLMM adaptive failed one dataset (43th) due to numeric
 problem.</li>
@@ -988,7 +990,8 @@ names(cols) &lt;- c(&quot;Computed&quot;, &quot;Observed/True&quot;)</code></pre
 <pre class="r"><code>rand_id &lt;- sample(unique(comp_list_allM_ref[[1]]$id), 2)
 
 p1 &lt;- comp_list_allM[[1]] %&gt;%
-  filter(id %in% rand_id) %&gt;% 
+  filter(id %in% rand_id) %&gt;%
+  rename(series = visit) %&gt;%
   mutate_at(vars(starts_with(&quot;eta&quot;)), 
             function(x)(exp(x)/(1+exp(x)))) %&gt;%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -999,12 +1002,13 @@ p1 &lt;- comp_list_allM[[1]] %&gt;%
              na.rm = T)+
   geom_point(aes(x=t, y=Yobs, col = &quot;Observed/True&quot;), size = 0.1,
              na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(visit))+
+  facet_grid(rows = vars(id), cols = vars(series))+
   scale_color_manual(values = cols)+
   labs(title = &quot;gmFPCA&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
 p2 &lt;- comp_list_allM_ref[[1]] %&gt;%
   filter(id %in% rand_id) %&gt;% 
+  rename(series = visit) %&gt;%
   mutate_at(vars(starts_with(&quot;eta&quot;)), 
             function(x)(exp(x)/(1+exp(x)))) %&gt;%
   mutate(eta=ifelse(is.na(Yobs), NA, eta),
@@ -1015,7 +1019,7 @@ p2 &lt;- comp_list_allM_ref[[1]] %&gt;%
              na.rm = T)+
   geom_point(aes(x=t, y=Yobs, col=&quot;Observed/True&quot;), size = 0.1,
              na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(visit))+
+  facet_grid(rows = vars(id), cols = vars(series))+
   scale_color_manual(values=cols)+
   labs(title = &quot;GLMMadaptive&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
 
@@ -1066,11 +1070,17 @@ Time (minutes)
 <pre class="r"><code>ise_gmfpca2 &lt;- bind_rows(comp_list_allM, .id = &quot;iter&quot;) %&gt;% 
   filter(is.na(Yobs)) %&gt;%
   mutate(error = (eta_comp-eta)^2) %&gt;%
+  group_by(iter, id) %&gt;% 
+  summarize(error = sum(error)) %&gt;%
+  ungroup() %&gt;%
   summarise(error = mean(error))
 
 ise_glmmad2 &lt;- bind_rows(comp_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
   filter(is.na(Yobs)) %&gt;%
   mutate(error = (eta_comp-eta)^2) %&gt;%
+  group_by(iter, id) %&gt;% 
+  summarize(error = sum(error)) %&gt;%
+  ungroup() %&gt;%
   summarise(error = mean(error))</code></pre>
 <pre class="r"><code># print(&quot;Integrated squared error:&quot;)
 data.frame(&quot;gmFPCA&quot; = ise_gmfpca2[1, 1], 
@@ -1081,20 +1091,20 @@ data.frame(&quot;gmFPCA&quot; = ise_gmfpca2[1, 1],
 <thead>
 <tr>
 <th style="text-align:right;">
-gmFPCA
+error
 </th>
 <th style="text-align:right;">
-GLMMadaptive
+error.1
 </th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align:right;">
-1.02
+307.24
 </td>
 <td style="text-align:right;">
-3.16
+948.79
 </td>
 </tr>
 </tbody>
@@ -1105,16 +1115,18 @@ GLMMadaptive
 <h2>AUC</h2>
 <pre class="r"><code>auc_gmfpca2 &lt;- bind_rows(comp_list_allM, .id = &quot;iter&quot;) %&gt;% 
   filter(is.na(Yobs)) %&gt;%
-  group_by(iter) %&gt;% 
+  group_by(iter, id) %&gt;% 
   summarise(auc = performance(prediction(eta_comp, Y),
                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
+  ungroup() %&gt;%
   summarise(auc = mean(auc))
 
 auc_glmmad2 &lt;- bind_rows(comp_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
   filter(is.na(Yobs)) %&gt;%
-  group_by(iter) %&gt;% 
+  group_by(iter, id) %&gt;% 
   summarise(auc = performance(prediction(eta_comp, Y),
                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
+  ungroup() %&gt;%
   summarise(auc = mean(auc))</code></pre>
 <pre class="r"><code>data.frame(&quot;gmFPCA&quot; = auc_gmfpca2[1, 1], 
            &quot;GLMMadaptive&quot;= auc_glmmad2[1, 1]) %&gt;%
@@ -1137,7 +1149,7 @@ auc.1
 0.82
 </td>
 <td style="text-align:right;">
-0.65
+0.63
 </td>
 </tr>
 </tbody>
