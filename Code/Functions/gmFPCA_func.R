@@ -6,7 +6,7 @@
 # library(refund)
 # library(fastGFPCA)
 
-# data: training data frame. must include colums id, t, visit, y
+# data: training data frame. must include colums id, t, visit, Y
 #       id and visit need to be factor
 #       visit need to be integer value
 # bin_w: how many observations are included in each bin
