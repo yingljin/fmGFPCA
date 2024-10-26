@@ -248,21 +248,30 @@ pred_id <- sample(id_te, 4)
 ##### Case 1: predict day 3 pm and evening #####
 
 # container
-df_pred1 <- data_te %>% filter(id %in% pred_id) %>%
-  filter(visit <=3) %>%
-  mutate(pred_2.5=NA)
-pred_time <- rep(NA, 4)
+# df_pred1 <- data_te %>% filter(id %in% pred_id) %>% 
+#   filter(visit <=3) %>%
+#   mutate(pred_2.5=NA)
+# pred_time <- rep(NA, 4)
 
+df_pred2<- data_te %>% filter(id %in% pred_id) %>%
+  mutate(pred_comp=NA)
+comp_time <- rep(NA, 4)
 
 
 for(i in seq_along(pred_id)){
   
   ## prediction observed
-  df_te_ij <- df_pred1 %>% filter(id == pred_id[i]) %>%
-    # filter(visit <= 3) %>%
-    filter(!(visit == 3 & t > 720))
+  # df_te_ij <- df_pred1 %>% filter(id == pred_id[i]) %>% 
+  #   # filter(visit <= 3) %>% 
+  #   filter(!(visit == 3 & t > 720))
   
-  
+  # computation: randomly select 5 hours (300min) of missing
+  df_te_ij <- df_pred1 %>% filter(id == pred_id[i]) 
+  mis_i <- sample(unique(df_te_ij$visit), 1)
+  mis_t <- sample(1:1000, 1)
+  mis_t <- mis_t:(mis_t+300)
+  df_te_ij <- 
+    
   pred_data <- list(J = 3, K = 1440,
                     Ju = 3, Ku = table(df_te_ij$visit), 
                     Nobs = nrow(df_te_ij), Y = df_te_ij$Y,
