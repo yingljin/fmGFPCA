@@ -75,7 +75,7 @@ cols <- c(brewer.pal(3, "Set2"), "#000000") # define a color palette
 names(cols) <- c("0 full series", "1 full series", "2 full series", "True")
 ```
 
-```{r pred_sim, fig.height=4, fig.width=10}
+```{r pred_sim, fig.height=4, fig.width=12}
 rand_id <- sample(101:200, 2)
 p1 <- pred_list_allM[[1]] %>%
   filter(id %in% rand_id) %>%
@@ -314,7 +314,7 @@ cols <- c("#66C2A5", "#000000") # define a color palette
 names(cols) <- c("Computed", "Observed/True")
 ```
 
-```{r miss_sim, fig.width=10, fig.height=4}
+```{r miss_sim, fig.width=12, fig.height=4}
 rand_id <- sample(unique(comp_list_allM_ref[[1]]$id), 2)
 
 p1 <- comp_list_allM[[1]] %>%

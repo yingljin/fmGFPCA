@@ -111,7 +111,8 @@ df_s2 %>% filter(id %in% 1:4 & bin %in% 1:5) %>%
   geom_line(aes(x=t_mid, y=eta_hat, col = visit))+
   geom_vline(xintercept = tend$t_end[1:5], linetype = "dashed", linewidth = 0.3)+
   facet_wrap(~id, nrow = 1)+
-  scale_color_manual(values = cols)
+  scale_color_manual(values = cols)+
+  labs(col = "Series")
 ggsave(filename = here("Images/bin_exp.png"),
        width = 14, height = 4, bg = "white")
 
@@ -162,7 +163,7 @@ p1 <- reeval_efunc_l1 %>% data.frame() %>%
   geom_line(aes(x=t, y=value, col=name))+
   scale_color_manual(values = cols)+
   theme_minimal()+
-  labs(title = "Subject-level PC functions", x="t", y="", color = "")
+  labs(title = "Subject level PC functions", x="t", y="", color = "")
   
 p2 <- reeval_efunc_l2 %>% data.frame() %>% 
   mutate(t = df_bin$t) %>% 
@@ -171,7 +172,7 @@ p2 <- reeval_efunc_l2 %>% data.frame() %>%
   geom_line(aes(x=t, y=value, col=name))+
   scale_color_manual(values = cols)+
   theme_minimal()+
-  labs(title = "Subject-visit-level PC functions", x="t", y="", color = "")
+  labs(title = "Subject-series level PC functions", x="t", y="", color = "")
 
 ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T)
 ggsave(filename = here("Images/gmfpca_fpc.png"),

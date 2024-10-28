@@ -143,8 +143,7 @@ M <- length(fit_mfpca$evalues$level2)
 # plot check
 plot(1:144, fit_mfpca$mu)
 
-plot(1:144, fit_mfpca$efunctions$level1)
-plot(1:144, fit_mfpca$efunctions$level2[,2])
+
 
 
 
@@ -196,6 +195,7 @@ system.time({
                          s(id, by=phi2, bs="re", k=10)+
                          s(id, by=phi3, bs="re", k=10)+
                          s(id, by=phi4, bs="re", k=10)+
+                         s(id, by=phi5, bs="re", k=10)+
                          s(id_visit, by=psi1, bs="re", k=10)+
                          s(id_visit, by=psi2, bs="re", k=10)+
                          s(id_visit, by=psi3, bs="re", k=10)+
@@ -253,7 +253,7 @@ df_pred1 <- data_te %>% filter(id %in% pred_id) %>%
   mutate(pred_2.5=NA)
 pred_time <- rep(NA, 4)
 
-
+Jmax <- 3
 
 for(i in seq_along(pred_id)){
   
@@ -266,7 +266,7 @@ for(i in seq_along(pred_id)){
   pred_data <- list(J = 3, K = 1440,
                     Ju = 3, Ku = table(df_te_ij$visit), 
                     Nobs = nrow(df_te_ij), Y = df_te_ij$Y,
-                    L = 4, M = 15,
+                    L = 5, M = 15,
                     efuncs_l1 = reeval_efunc_l1,
                     efuncs_l2 = reeval_efunc_l2,
                     b0 = mu,
@@ -319,6 +319,7 @@ df_pred1 <- df_pred1 %>% mutate(pred_2 = NA)
 head(df_pred1)
 
 pred_time2 <- rep(NA, 4)
+Jmax <- 3
 
 for(i in seq_along(pred_id)){
   
@@ -330,7 +331,7 @@ for(i in seq_along(pred_id)){
   pred_data <- list(J = 3, K = 1440,
                     Ju = 3, Ku = c(table(df_te_ij$visit), 0), 
                     Nobs = nrow(df_te_ij), Y = df_te_ij$Y,
-                    L = 4, M = 15,
+                    L = 5, M = 15,
                     efuncs_l1 = reeval_efunc_l1,
                     efuncs_l2 = reeval_efunc_l2,
                     b0 = mu,
@@ -372,7 +373,7 @@ for(i in seq_along(pred_id)){
 
 
 # about 10 minutes for 1 subject
-pred_time
+pred_time2
 
 
 ##### Figure #####
@@ -390,8 +391,12 @@ df_pred1 %>%
   geom_line(aes(x=t, y=pred_2, col = "Full visit"))+
   facet_wrap(~id, nrow = 1)+
   scale_color_manual(values = cols)+
-  labs(col = "", x = "Minute", y = "Activity")
-ggsave(file=here("Images/CaseStudyPred.png"), height = )
+  labs(col = "", x = "", y = "Activity")+
+  scale_x_continuous(breaks = seq(0,1440, by = 360), 
+                     labels = c("0am", "6am", "12pm", "6pm", "12am"))+
+  theme_minimal()
+ggsave(file=here("Images/case_study_pred.png"), 
+       height = 3, width = 12, bg = "white")
 
 ##### Save #####
 
