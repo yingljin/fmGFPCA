@@ -85,15 +85,15 @@ p1 <- pred_list_allM[[1]] %>%
          eta_pred_J3 = ifelse(series %in% 1:2|(series==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
-  geom_line(aes(x=t, y=probs, col="True"), linewidth=0.5)+
+  geom_line(aes(x=t, y=probs, col="True"), linewidth=0.5, linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_J1, col = "0 full series"), 
-            linetype="dashed", 
+            linewidth = 1,
             na.rm = T)+
   geom_line(aes(x=t, y=eta_pred_J2, col = "1 full series"), 
-            linetype="dashed", 
+            linewidth = 1,
             na.rm = T)+
   geom_line(aes(x=t, y=eta_pred_J3, col = "2 full series"), 
-            linetype="dashed", 
+            linewidth = 1,
             na.rm = T)+
   geom_point(aes(x=t, y=Y,  col="True"), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
@@ -108,13 +108,13 @@ p2 <- pred_list_allM_ref[[1]] %>%
          eta_pred_J3 = ifelse(series %in% 1:2|(series==3&t<=0.5), NA, eta_pred_J3)) %>%
   mutate_at(vars(starts_with("eta")), function(x)(exp(x)/(1+exp(x)))) %>% 
   ggplot()+
-  geom_line(aes(x=t, y=eta, col="True"), linewidth=0.5)+
+  geom_line(aes(x=t, y=eta, col="True"), linewidth=0.5, linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_J1, col = "0 full series"), 
-            linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 1)+
+            na.rm = T, alpha = 0.5, linewidth = 1)+
   geom_line(aes(x=t, y=eta_pred_J2, col = "1 full series"), 
-            linetype="dashed",na.rm = T, alpha = 0.5, linewidth = 0.8)+
+            na.rm = T, alpha = 0.5, linewidth = 0.8)+
   geom_line(aes(x=t, y=eta_pred_J3, col = "2 full series"), 
-            linetype="dashed", na.rm = T, alpha = 0.5, linewidth = 0.6)+
+            na.rm = T, alpha = 0.5, linewidth = 0.6)+
   geom_point(aes(x=t, y=Y, col = "True"), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values=cols)+

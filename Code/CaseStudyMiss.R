@@ -54,7 +54,8 @@ id_tr <- sample(unique(df_mpa$SEQN), size = N)
 
 data_tr <- df_mpa %>% filter(SEQN %in% id_tr) %>% 
   rename(id = SEQN, visit = PAXDAYWM, t=Minute, Y = Indicator)
-
+head(data_tr)
+data_tr$Yobs <- data_tr$Y
 
 #### Introducing missing ####
 
@@ -78,7 +79,7 @@ for(i in seq_along(id_mis)){
   start_mis <- sample(1:(1440-time_mis-1), size = 1)
   end_mis <- start_mis + time_mis
   
-  data_tr$Y[data_tr$id==id_mis[i] & data_tr$visit == day_mis  & data_tr$t > start_mis &  data_tr$t < end_mis ] <- NA
+  data_tr$Yobs[data_tr$id==id_mis[i] & data_tr$visit == day_mis  & data_tr$t > start_mis &  data_tr$t < end_mis ] <- NA
   
   
   df_mis$visit[i] <- day_mis
@@ -90,15 +91,15 @@ for(i in seq_along(id_mis)){
 
 
 data_tr %>% 
-  select(id, visit, t, Y) %>%
-  pivot_wider(values_from = Y, names_from = t) %>%
+  select(id, visit, t, Yobs) %>%
+  pivot_wider(values_from = Yobs, names_from = t) %>%
   visdat::vis_miss()
 
 df_mis
 data_tr %>% 
-  select(id, visit, t, Y) %>%
+  select(id, visit, t, Yobs) %>%
   group_by(id, visit) %>%
-  summarise(nmis = sum(is.na(Y))) %>%
+  summarise(nmis = sum(is.na(Yobs))) %>%
   filter(nmis > 0)
 
 #### gmFPCA using PVE ####
@@ -129,7 +130,7 @@ df_s2 <- data_tr %>%
   filter(complete.cases(.)) %>% ## make it accommodate missing values
   group_by(bin) %>%
   group_map(~{
-    fit_local <- glmer(Y~1+(1|id)+(1|id:visit), data = .x, 
+    fit_local <- glmer(Yobs~1+(1|id)+(1|id:visit), data = .x, 
                        family = binomial, nAGQ=0)
     eta_hat <- predict(fit_local, type = "link")
     .x$eta_hat <- eta_hat
@@ -213,6 +214,7 @@ system.time({
                          s(id, by=phi2, bs="re", k=10)+
                          s(id, by=phi3, bs="re", k=10)+
                          s(id, by=phi4, bs="re", k=10)+
+                         s(id, by=phi5, bs="re", k=10)+
                          s(id_visit, by=psi1, bs="re", k=10)+
                          s(id_visit, by=psi2, bs="re", k=10)+
                          s(id_visit, by=psi3, bs="re", k=10)+
@@ -226,8 +228,7 @@ system.time({
                          s(id_visit, by=psi11, bs="re", k=10)+
                          s(id_visit, by=psi12, bs="re", k=10)+
                          s(id_visit, by=psi13, bs="re", k=10)+
-                         s(id_visit, by=psi14, bs="re", k=10)+
-                         s(id_visit, by=psi15, bs="re", k=10), 
+                         s(id_visit, by=psi14, bs="re", k=10), 
                        family = binomial, data=data_tr, 
                        method = "fREML",
                        discrete = TRUE)
@@ -239,7 +240,7 @@ df_mis
 
 data_tr %>%
   group_by(id, visit) %>%
-  summarize(nmis = sum(is.na(Y))) %>%
+  summarize(nmis = sum(is.na(Yobs))) %>%
   filter(nmis > 0)
 
 # prediction
@@ -251,20 +252,22 @@ df_pred <- data_tr %>%
 pred_eta <- predict(global_glmm, newdata = df_pred)
 
 df_pred <- df_pred %>% 
-  select(id, t, visit, Y) %>%
+  select(id, t, visit, Y, Yobs) %>%
   mutate(eta_comp = pred_eta)
 
 df_pred <- df_pred %>% left_join(df_mis)
 
 #### plot ####
 library(RColorBrewer)
-cols <- c("#FC8D62", "#000000")
-names(cols) <- c("Computed",  "Observed")
+brewer.pal(3, "Set2")
+cols <- c("#FC8D62","#66C2A5", "#000000")
+names(cols) <- c("Computed", "True", "Observed")
 df_pred %>%
   mutate(eta_comp=exp(eta_comp)/(1+exp(eta_comp))) %>%
-  mutate(eta_comp = ifelse(is.na(Y), eta_comp, NA)) %>%
+  mutate(eta_comp = ifelse(is.na(Yobs), eta_comp, NA)) %>%
+  mutate(color = ifelse(is.na(Yobs), "True", "Observed")) %>%
   ggplot()+
-  geom_point(aes(x=t, y=Y, col = "Observed"), size = 0.2)+
+  geom_point(aes(x=t, y=Y, col = color), size = 0.2)+
   geom_line(aes(x=t, y=eta_comp, col = "Computed"))+
   facet_wrap(~id, nrow = 1)+
   scale_color_manual(values = cols)+
@@ -290,6 +293,62 @@ data_tr %>%
 data_pred <- data_tr %>%
   filter(id %in% id_mis) 
 
+#### Fill missing value with GLMMadaptive ####
 
 
+# data
+data_tr2 <- data_tr[, 1:6]
+data_tr2$id_visit <- paste0(data_tr2$id, "_", data_tr2$visit)
 
+# fit model
+system.time({
+  fit_glmmad <- mixed_model(fixed = Yobs ~ ns(t, df = 2),
+                                      random = ~ ns(t, df = 2) | id_visit,
+                                      data = data_tr2,
+                                      family = binomial())
+})
+
+
+# predict
+df_pred2 <- df_pred[, 1:5]
+pred_eta2 <- predict(fit_glmmad, newdata = df_pred2)
+
+df_pred$eta_comp2 <- pred_eta2
+
+
+#### save outcome ####
+save(df_pred, global_glmm,
+     file = here("Data/CaseStudyMiss.RData"))
+
+df_pred <- df_pred %>% 
+  select(id, t, visit, Y, Yobs) %>%
+  mutate(eta_comp = pred_eta)
+
+df_pred <- df_pred %>% left_join(df_mis)
+
+
+#### plot ####
+
+brewer.pal(3, "Set2")
+cols <- c(brewer.pal(3, "Set2"), "#000000")
+names(cols) <- c("gmFPCA", "GLMMadaptive", "True", "Observed")
+
+df_pred %>%
+  mutate(eta_comp=exp(eta_comp)/(1+exp(eta_comp)),
+         eta_comp2=exp(eta_comp2)/(1+exp(eta_comp2))) %>%
+  mutate(eta_comp = ifelse(is.na(Yobs), eta_comp, NA),
+         eta_comp2 = ifelse(is.na(Yobs), eta_comp2, NA)) %>%
+  mutate(color = ifelse(is.na(Yobs), "True", "Observed")) %>%
+  ggplot()+
+  geom_point(aes(x=t, y=Y, col = color), size = 0.2)+
+  geom_line(aes(x=t, y=eta_comp, col = "gmFPCA"))+
+  geom_line(aes(x=t, y=eta_comp2, col = "GLMMadaptive"))+
+  facet_wrap(~id, nrow = 1)+
+  scale_color_manual(values = cols)+
+  scale_x_continuous(breaks = seq(0,1440, by = 360), 
+                     labels = c("0am", "6am", "12pm", "6pm", "12am"))+
+  theme_minimal()+
+  theme(legend.position="bottom")+
+  labs(x="Minute", col=" ")
+ggsave(filename = "Images/case_study_miss.png", 
+       height = 4, width = 12, bg = "white")

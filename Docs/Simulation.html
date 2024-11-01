@@ -11,7 +11,7 @@
 
 <meta name="author" content="Ying Jin" />
 
-<meta name="date" content="2024-10-28" />
+<meta name="date" content="2024-10-31" />
 
 <title>Simulation</title>
 
@@ -254,7 +254,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Simulation</h1>
 <h4 class="author">Ying Jin</h4>
-<h4 class="date">2024-10-28</h4>
+<h4 class="date">2024-10-31</h4>
 
 </div>
 
@@ -303,15 +303,15 @@ p1 &lt;- pred_list_allM[[1]] %&gt;%
          eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
   mutate_at(vars(starts_with(&quot;eta_pred&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
   ggplot()+
-  geom_line(aes(x=t, y=probs, col=&quot;True&quot;), linewidth=0.5)+
+  geom_line(aes(x=t, y=probs, col=&quot;True&quot;), linewidth=0.5, linetype = &quot;dashed&quot;)+
   geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
-            linetype=&quot;dashed&quot;, 
+            linewidth = 1,
             na.rm = T)+
   geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
-            linetype=&quot;dashed&quot;, 
+            linewidth = 1,
             na.rm = T)+
   geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
-            linetype=&quot;dashed&quot;, 
+            linewidth = 1,
             na.rm = T)+
   geom_point(aes(x=t, y=Y,  col=&quot;True&quot;), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
@@ -326,13 +326,13 @@ p2 &lt;- pred_list_allM_ref[[1]] %&gt;%
          eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
   mutate_at(vars(starts_with(&quot;eta&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
   ggplot()+
-  geom_line(aes(x=t, y=eta, col=&quot;True&quot;), linewidth=0.5)+
+  geom_line(aes(x=t, y=eta, col=&quot;True&quot;), linewidth=0.5, linetype = &quot;dashed&quot;)+
   geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
-            linetype=&quot;dashed&quot;, na.rm = T, alpha = 0.5, linewidth = 1)+
+            na.rm = T, alpha = 0.5, linewidth = 1)+
   geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
-            linetype=&quot;dashed&quot;,na.rm = T, alpha = 0.5, linewidth = 0.8)+
+            na.rm = T, alpha = 0.5, linewidth = 0.8)+
   geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
-            linetype=&quot;dashed&quot;, na.rm = T, alpha = 0.5, linewidth = 0.6)+
+            na.rm = T, alpha = 0.5, linewidth = 0.6)+
   geom_point(aes(x=t, y=Y, col = &quot;True&quot;), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values=cols)+
