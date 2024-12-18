@@ -68,6 +68,9 @@ save(data_list_allM_J200,
 
 
 
+
+
+
 #### gmFPCA ####
 
 # load(here("Data/SimData.RData"))
@@ -221,6 +224,10 @@ mean(pred_time_vec) # 5.4 minutes each simulation
 
 
 
+
+
+
+
 #### GLMMadaptive ####
 load(here("Data/SimData/SimData_J200.RData"))
 
@@ -236,7 +243,7 @@ pred_list_allM_ref <- list()
 data_list_allM <- data_list_allM_J200
 rm(data_list_allM_J200)
 
- m <- 1
+m <- 1
 # simulation
 for(m in 1:M){
   
@@ -253,17 +260,11 @@ for(m in 1:M){
   
   tic <- Sys.time()
   # mixed model with nested grouping effect
-  ## technically, this is not nesting. But the real nesting one is not fittable
-  # with spline basis? 
-  glmm_fit <- mixed_model(fixed = Y ~ ns(t, df = 2),
-                          random = ~ ns(t, df = 2)  | id_visit,
+  ## start with a nested, intercept-only model
+  glmm_fit <- mixed_model(fixed = Y ~ 1,
+                          random = ~ 1  | id/visit,
                           data = data_tr,
                     family = binomial())
-  # linear model
-  # glmm_fit <- mixed_model(fixed = Y ~ t,
-  #                         random = ~ t | id_visit,
-  #                         data = data_tr,
-  #                         family = binomial())
   toc <- Sys.time()
   fit_time_vec_ref[m] <- difftime(toc, tic, units = "mins")
   
