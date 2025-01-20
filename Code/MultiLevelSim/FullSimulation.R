@@ -7,7 +7,7 @@ library(lme4)
 library(mgcv)
 library(refund)
 library(rstan)
-library(instantiate)
+# library(instantiate)
 library(GLMMadaptive)
 library(splines)
 
@@ -25,15 +25,14 @@ set.seed(915)
 # bin every 10 observations
 # number of FPC = 4
 
-M <- 100
+M  <- 100
 Ntr <- 100
 Nte <- 100
 
-J <- 3 # total number of visits
+J <- 2 # total number of visits
 K <- 200
 
 #### Generate data ####
-
 
 # containers
 data_list_allM_J200 <- list()
@@ -52,34 +51,25 @@ for(m in 1:M){
 
 # check
 
-data_list_allM_J200[[1]] %>% filter(id %in% sample(1:200, 4)) %>% 
+data_list_allM_J200[[1]] %>% filter(id %in% sample(1:200, 2)) %>% 
   ggplot()+
   geom_line(aes(x=t, y=probs))+
   geom_point(aes(x=t, y=Y), size = 0.5)+
   facet_grid(row = vars(id), col=vars(visit))
 
-save(data_list_allM_J200, 
-     file = here("Data/SimData/SimData_J200.RData")) # data that will be used for all of simulation
-
-
-
-
-
-
-
-
-
+# save(data_list_allM_J200, 
+#      file = here("Data/SimData/SimData_J200.RData")) # data that will be used for all of simulation
 
 
 #### gmFPCA ####
 
 # load(here("Data/SimData.RData"))
 
-load(here("Data/SimData/SimData_J200.RData"))
+# load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-# M <- 5
+M <- 3
 
 fit_time_vec <- rep(NA, M)
 pred_time_vec <- rep(NA, M)
@@ -190,16 +180,16 @@ for(m in 1:M){
 }
 
 # check
-pred_list_allM[[100]] %>% #head()
+pred_list_allM[[1]] %>% #head()
 # pred_df_m %>%
-  filter(id %in% sample(101:200, 4)) %>% #head()
+  filter(id %in% sample(101:200, 2)) %>% #head()
   # filter(id==41) %>%
   mutate_at(vars(starts_with("eta_pred")), function(x)(exp(x)/(1+exp(x)))) %>%
   ggplot()+
   geom_line(aes(x=t, y=probs, col = "True"))+
   geom_line(aes(x=t, y=eta_pred_J1, col = "J1"), linetype = "dashed")+
   geom_line(aes(x=t, y=eta_pred_J2, col = "J2"), linetype = "dashed")+
-  geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
+  # geom_line(aes(x=t, y=eta_pred_J3, col = "J3"), linetype = "dashed")+
   # geom_line(aes(x=t, y=I(eta_pred-0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   # geom_line(aes(x=t, y=I(eta_pred+0.96*eta_sd), col = "Pred"), linetype = "dashed")+
   facet_grid(rows = vars(id), cols = vars(visit))
