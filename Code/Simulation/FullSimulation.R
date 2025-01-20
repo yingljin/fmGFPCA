@@ -1,3 +1,6 @@
+# This script implements the full simulation 
+# using multi-level fGFPCA
+# as the proposed method in the manuscript
 
 #### Set up ####
 
@@ -16,52 +19,23 @@ source(here("Code/Functions/gmFPCA_func.R"))
 source(here("Code/Functions/ReEvalEfuncs.R"))
 # source(here("Code/Functions/Predict.R"))
 
-set.seed(915)
+set.seed(120)
 # devtools::install_github("julia-wrobel/fastGFPCA", build_vignettes = TRUE)
-
-# toy simulation scheme
-# N_train = 100,  N_test = 100, J = 3, K = 200
-# observations stops at the the midpoint of each visit
-# bin every 10 observations
-# number of FPC = 4
-
-M  <- 100
-Ntr <- 100
-Nte <- 100
-
-J <- 2 # total number of visits
-K <- 200
-
-#### Generate data ####
-
-# containers
-data_list_allM_J200 <- list()
-
-for(m in 1:M){
-  # generate training data
-  data_all <- gen_bi(N = Ntr+Nte, J = J, K = K, 
-                     t_vec = seq(0, 1, length.out = K),
-                     L = 4, M = 4, 
-                     lambda = 0.5^((1:4)-1), 
-                     gamma =  0.5^((1:4)-1))
-  data_all$data$id <- as.factor(data_all$data$id)
-  data_all$data$visit <- as.factor(data_all$data$visit)
-  data_list_allM_J200[[m]] <- data_all$data
-}
-
-# check
-
-data_list_allM_J200[[1]] %>% filter(id %in% sample(1:200, 2)) %>% 
-  ggplot()+
-  geom_line(aes(x=t, y=probs))+
-  geom_point(aes(x=t, y=Y), size = 0.5)+
-  facet_grid(row = vars(id), col=vars(visit))
-
-# save(data_list_allM_J200, 
-#      file = here("Data/SimData/SimData_J200.RData")) # data that will be used for all of simulation
 
 
 #### gmFPCA ####
+
+load(here("Data/SimData/SimData.RData")) # data generated from Code/GenData.R
+
+N <- length(unique(data_list[[1]]$id))
+K <- length(unique(data_list[[1]]$t))
+J <- length(unique(data_list[[1]]$visit))
+t <- unique(data_list[[1]]$t)
+M <- length(data_list)
+# K <- 4 # number of eigenfunctions to use
+
+# training and testing sample size
+Ntr <- Nte <- 100
 
 # load(here("Data/SimData.RData"))
 
@@ -76,14 +50,10 @@ pred_time_vec <- rep(NA, M)
 pred_list_allM <- list()
 
 # data
-data_list_allM <- data_list_allM_J200
-rm(data_list_allM_J200)
-
-
 # simulation
 for(m in 1:M){
   
-  data_all <- data_list_allM[[m]]
+  data_all <- data_list[[m]]
   
   # data split
   ## training '
@@ -105,7 +75,7 @@ for(m in 1:M){
   
   ## container
   pred_df_m <- data_all %>% filter(id %in% te_id) %>% 
-    mutate(eta_pred_J1 = NA, eta_pred_J2 = NA, eta_pred_J3 = NA,
+    mutate(eta_pred_J1 = NA, eta_pred_J2 = NA,
            id = droplevels(id))
   
   ## prediction
@@ -118,7 +88,8 @@ for(m in 1:M){
       # for visits before the jth visit, full track
       # for visits from the jth visit, half track
       df_te_ij <- data_te %>% filter(id == te_id[i]) %>% 
-        filter(as.numeric(visit)<j | t<=tmax) 
+        filter(as.numeric(visit)<=j) %>%
+        filter(!(as.numeric(visit) == j & t > tmax)) 
       
       pred_data <- list(J = J, K = K,
                         Ju = J, Ku = table(df_te_ij$visit), 
@@ -196,7 +167,7 @@ pred_list_allM[[1]] %>% #head()
 
 
 save(fit_time_vec, pred_time_vec, pred_list_allM, 
-     file = here("Data/SimOutput/SimOutput_J200.RData"))
+     file = here("Data/SimOutput/SimOutputMulti.RData"))
 
 
 mean(fit_time_vec) # 0.4 minutes each simulation
