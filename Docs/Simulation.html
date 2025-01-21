@@ -11,11 +11,11 @@
 
 <meta name="author" content="Ying Jin" />
 
-<meta name="date" content="2024-10-31" />
+<meta name="date" content="2025-01-21" />
 
 <title>Simulation</title>
 
-<script src="Simulation_files/header-attrs-2.28/header-attrs.js"></script>
+<script src="Simulation_files/header-attrs-2.29/header-attrs.js"></script>
 <script src="Simulation_files/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="Simulation_files/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
@@ -254,7 +254,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Simulation</h1>
 <h4 class="author">Ying Jin</h4>
-<h4 class="date">2024-10-31</h4>
+<h4 class="date">2025-01-21</h4>
 
 </div>
 
@@ -267,7 +267,8 @@ div.tocify {
 data.</p>
 <ul>
 <li><p>Sample size: training = 100, test = 100</p></li>
-<li><p>Number of series J = 3</p></li>
+<li><p>Number of series J = 2 (reduced because of computation
+time)</p></li>
 <li><p>Number of observations at each vitis K = 200 (when K = 100,
 numeric issues are likely to happen)</p></li>
 <li><p>Make prediction with observations until the middle of series 2
@@ -279,77 +280,85 @@ and 3 separately</p></li>
 Bernoulli(g(\eta_{ij}(t)))\]</span></p>
 <p><span
 class="math display">\[\eta_{ij}(t)=b_0(t)+\sum_{l=1}^4\xi_{il}\phi_l(t)+\sum_{m=1}^4\zeta_{ijm}\psi_m(t)\]</span></p>
-<ul>
-<li>Level 1:</li>
-</ul>
-<p><span class="math display">\[\phi_l(t) = \{\sqrt{2}sin(2\pi t),
-\sqrt2 cos(2\pi t), \sqrt2 sin (4\pi t), \sqrt2 cos(4\pi
-t)\}\]</span></p>
-<p><span class="math display">\[\xi_{il} \sim N(0, \lambda_l),
-\hspace{0.5cm} \lambda_l = 0.5^{l-1}, l=1,2, 3, 4\]</span></p>
+<p><span class="math display">\[
+\begin{aligned}
+\text{Subject level: } &amp; \mathbf{\Phi} = \{\sqrt{2}sin(2\pi t),
+\sqrt2 cos(2\pi t), \sqrt2 sin (4\pi t), \sqrt2 cos(4\pi t)\}, \\
+                       &amp; \mathbf{\Lambda}  = \{0.5^{l-1}\}, l=1,2,
+3, 4;\\
+\text{Subject-series level: } &amp; \mathbf{\Psi} = \{\sqrt{2}sin(6\pi
+t), \sqrt2 cos(6\pi t), \sqrt2 sin (8\pi t), \sqrt2 cos(8\pi t)\},\\
+                             &amp; \mathbf{\Gamma} = \{0.5^{m-1}\},
+m=1,2, 3, 4.
+\end{aligned}
+\]</span></p>
+<p>Below is an example of generated data</p>
+<pre class="r"><code>data_list[[1]] %&gt;% 
+  filter(id %in% 101:104) %&gt;%
+  ggplot()+
+  geom_point(aes(x=t, y= Y, col = &quot;Outcome&quot;), size = 0.2)+
+  geom_line(aes(x=t, y=probs, col = &quot;Latent&quot;))+
+  facet_grid(rows = vars(id), cols = vars(visit))+
+  scale_color_manual(values = c(&quot;Outcome&quot; = &quot;#000000&quot;,
+                                &quot;Latent&quot; = &quot;#66C2A5&quot;))</code></pre>
+<p><img src="Simulation_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>
-<div id="figure" class="section level3">
-<h3>Figure</h3>
-<pre class="r"><code>cols &lt;- c(brewer.pal(3, &quot;Set2&quot;), &quot;#000000&quot;) # define a color palette 
-names(cols) &lt;- c(&quot;0 full series&quot;, &quot;1 full series&quot;, &quot;2 full series&quot;, &quot;True&quot;)</code></pre>
-<pre class="r"><code>rand_id &lt;- sample(101:200, 2)
-p1 &lt;- pred_list_allM[[1]] %&gt;%
-  filter(id %in% rand_id) %&gt;%
-  rename(series = visit) %&gt;% 
-  mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
-  mutate_at(vars(starts_with(&quot;eta_pred&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
+<p>Here, I have changed the competing method to single-level fGFPCA,
+because the GLMMadaptice is clearly not fitting the correct model.</p>
+<div id="predicted-tracks" class="section level3">
+<h3>Predicted tracks</h3>
+<p>Take subject 101-104 in the test set as example:</p>
+<pre class="r"><code>cols &lt;- c(&quot;#FC8D62&quot;, &quot;#8DA0CB&quot;, &quot;#000000&quot;) # define a color palette
+names(cols) &lt;- c(&quot;Half series&quot;, &quot;One and a half series&quot;, &quot;True&quot;)</code></pre>
+<pre class="r"><code>p1 &lt;- pred_list_allM[[1]] %&gt;%
+  filter(id %in% 101:104) %&gt;%
+  rename(series = visit) %&gt;%
+  mutate(eta_pred_J1 = ifelse(series==1 &amp; t&lt;=0.5, NA, eta_pred_J1),
+         eta_pred_J2 = ifelse(series==2 &amp; t &gt; 0.5, eta_pred_J2, NA)) %&gt;%
+  mutate_at(vars(starts_with(&quot;eta_pred&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;%
   ggplot()+
   geom_line(aes(x=t, y=probs, col=&quot;True&quot;), linewidth=0.5, linetype = &quot;dashed&quot;)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;Half series&quot;),
             linewidth = 1,
             na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
+  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;One and a half series&quot;),
             linewidth = 1,
-            na.rm = T)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
-            linewidth = 1,
-            na.rm = T)+
+            na.rm = T)+ 
   geom_point(aes(x=t, y=Y,  col=&quot;True&quot;), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
   scale_color_manual(values = cols)+
-  labs(title = &quot;gmFPCA&quot;, color = &quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
-
-p2 &lt;- pred_list_allM_ref[[1]] %&gt;%
-  filter(id %in% rand_id) %&gt;%
-  rename(series = visit) %&gt;% 
-  mutate(eta_pred_J1 = ifelse(t&lt;=0.5, NA, eta_pred_J1),
-         eta_pred_J2 = ifelse(series==1|(series %in% 2:3 &amp; t&lt;=0.5), NA, eta_pred_J2),
-         eta_pred_J3 = ifelse(series %in% 1:2|(series==3&amp;t&lt;=0.5), NA, eta_pred_J3)) %&gt;%
-  mutate_at(vars(starts_with(&quot;eta&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;% 
+  labs(title = &quot;gmFPCA&quot;, color = &quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)</code></pre>
+<pre class="r"><code>p2 &lt;- pred_list_fGFPCA[[1]] %&gt;%
+  filter(id %in% 101:104) %&gt;%
+  rename(series = visit,
+         eta_pred_J1 = pred50, eta_pred_J2 = pred150) %&gt;%
+  mutate(eta_pred_J1 = ifelse(series==1 &amp; t&lt;=0.5, NA, eta_pred_J1),
+         eta_pred_J2 = ifelse(series==2 &amp; t &gt; 0.5, eta_pred_J2, NA)) %&gt;%
+  mutate_at(vars(starts_with(&quot;eta_pred&quot;)), function(x)(exp(x)/(1+exp(x)))) %&gt;%
   ggplot()+
-  geom_line(aes(x=t, y=eta, col=&quot;True&quot;), linewidth=0.5, linetype = &quot;dashed&quot;)+
-  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;0 full series&quot;), 
-            na.rm = T, alpha = 0.5, linewidth = 1)+
-  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;1 full series&quot;), 
-            na.rm = T, alpha = 0.5, linewidth = 0.8)+
-  geom_line(aes(x=t, y=eta_pred_J3, col = &quot;2 full series&quot;), 
-            na.rm = T, alpha = 0.5, linewidth = 0.6)+
-  geom_point(aes(x=t, y=Y, col = &quot;True&quot;), size = 0.2)+
+  geom_line(aes(x=t, y=probs, col=&quot;True&quot;), linewidth=0.5, linetype = &quot;dashed&quot;)+
+  geom_line(aes(x=t, y=eta_pred_J1, col = &quot;Half series&quot;),
+            linewidth = 1,
+            na.rm = T)+
+  geom_line(aes(x=t, y=eta_pred_J2, col = &quot;One and a half series&quot;),
+            linewidth = 1,
+            na.rm = T)+ 
+  geom_point(aes(x=t, y=Y,  col=&quot;True&quot;), size = 0.2)+
   facet_grid(row = vars(id), col=vars(series))+
-  scale_color_manual(values=cols)+
-  labs(title = &quot;GLMMadaptive&quot;, col=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
-
-ggarrange(p1, p2, nrow=1, common.legend = T, legend = &quot;bottom&quot;)</code></pre>
-<p><img src="Simulation_files/figure-html/pred_sim-1.png" width="1152" /></p>
+  scale_color_manual(values = cols)+
+  labs(title = &quot;fGFPCA&quot;, color = &quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)</code></pre>
+<pre class="r"><code>ggarrange(p1, p2, nrow = 1, common.legend = T)</code></pre>
+<p><img src="Simulation_files/figure-html/unnamed-chunk-4-1.png" width="960" /></p>
 </div>
 <div id="computation-time" class="section level3">
 <h3>Computation time</h3>
 <pre class="r"><code># print(&quot;Computation time:&quot;)
-data.frame(&quot;gmFPCA&quot; = c(mean(fit_time_vec), 
-                        mean(pred_time_vec)),
-           &quot;GLMMadaptive&quot; = c(mean(fit_time_vec_ref),
-                              mean(pred_time_vec_ref))) %&gt;% 
-  mutate(&quot;Time (mins)&quot; = c(&quot;Fit&quot;, &quot;Prediction&quot;), .before=1) %&gt;%
-  kable(digits = 2) %&gt;% 
+data.frame(&quot;gmFPCA&quot; = c(mean(time_gmFPCA)),
+           &quot;fGFPCA&quot; = c(mean(time_fGFPCA))) %&gt;%
+  mutate(&quot;Time (mins)&quot; = NA, .before=1) %&gt;%
+  kable(digits = 2) %&gt;%
   kable_styling(full_width = F)</code></pre>
 <table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
 <thead>
@@ -361,31 +370,19 @@ Time (mins)
 gmFPCA
 </th>
 <th style="text-align:right;">
-GLMMadaptive
+fGFPCA
 </th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align:left;">
-Fit
 </td>
 <td style="text-align:right;">
-0.39
+2.43
 </td>
 <td style="text-align:right;">
-2.40
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Prediction
-</td>
-<td style="text-align:right;">
-5.82
-</td>
-<td style="text-align:right;">
-0.02
+1.1
 </td>
 </tr>
 </tbody>
@@ -393,103 +390,75 @@ Prediction
 </div>
 <div id="integerated-squared-error" class="section level3">
 <h3>Integerated squared error</h3>
-<pre class="r"><code>ise_gmfpca &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;% 
+<pre class="r"><code>ise_gmFPCA &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;%
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   mutate(error_J1 = (eta_pred_J1-eta)^2,
-         error_J2 = (eta_pred_J2-eta)^2,
-         error_J3 = (eta_pred_J3-eta)^2) %&gt;%
+         error_J2 = (eta_pred_J2-eta)^2) %&gt;%
   group_by(iter, visit, window, id) %&gt;%
-  summarise_at(vars(starts_with(&quot;error_&quot;)), sum) %&gt;% 
+  summarise_at(vars(starts_with(&quot;error_&quot;)), sum) %&gt;%
   group_by(iter, visit, window) %&gt;%
-  summarise_at(vars(starts_with(&quot;error_&quot;)), mean) %&gt;% 
+  summarise_at(vars(starts_with(&quot;error_&quot;)), mean) %&gt;%
   group_by(visit, window) %&gt;%
   summarise_at(vars(starts_with(&quot;error_&quot;)), mean)
 
-ise_gmfpca &lt;- ise_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
-ise_gmfpca$error_J2[1] &lt;- NA
-ise_gmfpca$error_J3[1:2] &lt;- NA
-colnames(ise_gmfpca) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visit&quot;)</code></pre>
-<pre class="r"><code>ise_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
+ise_gmFPCA$error_J1[1] &lt;- NA
+ise_gmFPCA$error_J2[1:3] &lt;- NA</code></pre>
+<pre class="r"><code>ise_fGFPCA &lt;- bind_rows(pred_list_fGFPCA, .id = &quot;iter&quot;) %&gt;%
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
-  mutate(error_J1 = (eta_pred_J1-eta)^2,
-         error_J2 = (eta_pred_J2-eta)^2,
-         error_J3 = (eta_pred_J3-eta)^2) %&gt;%
+  mutate(error_J1 = (pred50-eta)^2,
+         error_J2 = (pred150-eta)^2) %&gt;%
   group_by(iter, visit, window, id) %&gt;%
-  summarise_at(vars(starts_with(&quot;error_&quot;)), sum) %&gt;% 
+  summarise_at(vars(starts_with(&quot;error_&quot;)), sum) %&gt;%
   group_by(iter, visit, window) %&gt;%
-  summarise_at(vars(starts_with(&quot;error_&quot;)), mean) %&gt;% 
+  summarise_at(vars(starts_with(&quot;error_&quot;)), mean) %&gt;%
   group_by(visit, window) %&gt;%
-  summarise_at(vars(starts_with(&quot;error_&quot;)), mean)  
+  summarise_at(vars(starts_with(&quot;error_&quot;)), mean)
 
-ise_glmmad &lt;- ise_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
-ise_glmmad$error_J2[1] &lt;- NA
-ise_glmmad$error_J3[1:2] &lt;- NA
-colnames(ise_glmmad) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visit&quot;)</code></pre>
-<pre class="r"><code># print(&quot;Integrated squared error:&quot;)
-ise_gmfpca %&gt;% 
-  add_column(ise_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
-  kable(digits = 2) %&gt;% 
+ise_fGFPCA$error_J1[1] &lt;- NA
+ise_fGFPCA$error_J2[1:3] &lt;- NA</code></pre>
+<pre class="r"><code>ise &lt;- inner_join(ise_gmFPCA, ise_fGFPCA, by = c(&quot;visit&quot;, &quot;window&quot;))
+
+colnames(ise) &lt;- c(&quot;Series&quot;, &quot;Prediction window&quot;,
+                          &quot;Half series&quot;, &quot;One and a half series&quot;,
+                          &quot;Half series&quot;, &quot;One and a half series&quot;)
+
+ise %&gt;% kable(digits = 2) %&gt;% 
   kable_styling(full_width = F) %&gt;%
-  add_header_above(c(&quot; &quot; = 2, 
-                     &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
-  add_header_above(c(&quot;Prediction window&quot; = 2,
-                         &quot;Observed window&quot; = 6))</code></pre>
+  add_header_above(c(&quot; &quot; = 2, &quot;gmFPCA&quot; = 2, &quot;fGFPCA&quot; = 2)) </code></pre>
 <table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-Prediction window
-</div>
-</th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="6">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-Observed window
-</div>
-</th>
-</tr>
-<tr>
 <th style="empty-cells: hide;border-bottom:hidden;" colspan="2">
 </th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
 <div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
 gmFPCA
 </div>
 </th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
 <div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-GLMMadaptive
+fGFPCA
 </div>
 </th>
 </tr>
 <tr>
 <th style="text-align:left;">
-visit
+Series
 </th>
 <th style="text-align:left;">
-Time
+Prediction window
 </th>
 <th style="text-align:right;">
-0 full visit
+Half series
 </th>
 <th style="text-align:right;">
-1 full visit
+One and a half series
 </th>
 <th style="text-align:right;">
-2 full visit
+Half series
 </th>
 <th style="text-align:right;">
-0 full visit
-</th>
-<th style="text-align:right;">
-1 full visit
-</th>
-<th style="text-align:right;">
-2 full visit
+One and a half series
 </th>
 </tr>
 </thead>
@@ -499,19 +468,49 @@ Time
 1
 </td>
 <td style="text-align:left;">
+[0,0.5]
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:left;">
 (0.5,1]
 </td>
 <td style="text-align:right;">
-163.94
+192.36
 </td>
 <td style="text-align:right;">
 </td>
 <td style="text-align:right;">
+270.32
 </td>
 <td style="text-align:right;">
-343.28
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2
+</td>
+<td style="text-align:left;">
+[0,0.5]
 </td>
 <td style="text-align:right;">
+224.60
+</td>
+<td style="text-align:right;">
+</td>
+<td style="text-align:right;">
+300.15
 </td>
 <td style="text-align:right;">
 </td>
@@ -524,155 +523,90 @@ Time
 (0.5,1]
 </td>
 <td style="text-align:right;">
-164.23
+277.67
 </td>
 <td style="text-align:right;">
-107.93
+122.76
 </td>
 <td style="text-align:right;">
+326.91
 </td>
 <td style="text-align:right;">
-340.96
-</td>
-<td style="text-align:right;">
-340.96
-</td>
-<td style="text-align:right;">
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-3
-</td>
-<td style="text-align:left;">
-(0.5,1]
-</td>
-<td style="text-align:right;">
-165.96
-</td>
-<td style="text-align:right;">
-109.51
-</td>
-<td style="text-align:right;">
-98.75
-</td>
-<td style="text-align:right;">
-345.81
-</td>
-<td style="text-align:right;">
-345.81
-</td>
-<td style="text-align:right;">
-345.81
+280.75
 </td>
 </tr>
 </tbody>
 </table>
-<p>For series 3, the predictions are identical. This is not a coding
-error. Because prediction of the three series are made at the same time,
-and the other series are not identical.</p>
-<p>For GLMM adaptive, it doesn’t matter how much data is observed before
-the prediction window. The prediction stays identical.</p>
 </div>
 <div id="auc" class="section level3">
 <h3>AUC</h3>
-<pre class="r"><code>auc_gmfpca &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;% 
+<pre class="r"><code>auc_gmFPCA &lt;- bind_rows(pred_list_allM, .id = &quot;iter&quot;) %&gt;%
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   group_by(iter, id, visit, window) %&gt;%
   summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
                                measure = &quot;auc&quot;)@y.values[[1]],
             auc_J2 = performance(prediction(eta_pred_J2, Y),
-                               measure = &quot;auc&quot;)@y.values[[1]],
-            auc_J3 = performance(prediction(eta_pred_J3, Y),
-                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;% 
+                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
   group_by(visit, window) %&gt;%
   summarise_at(vars(starts_with(&quot;auc_&quot;)), mean)
 
-auc_gmfpca &lt;- auc_gmfpca %&gt;% filter(window == &quot;(0.5,1]&quot;)
-auc_gmfpca$auc_J2[1] &lt;- NA
-auc_gmfpca$auc_J3[1:2] &lt;- NA
-colnames(auc_gmfpca) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visit&quot;)</code></pre>
-<pre class="r"><code>auc_glmmad &lt;- bind_rows(pred_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
+auc_gmFPCA$auc_J1[1] &lt;- NA
+auc_gmFPCA$auc_J2[1:3] &lt;- NA</code></pre>
+<pre class="r"><code>auc_fGFPCA &lt;- bind_rows(pred_list_fGFPCA, .id = &quot;iter&quot;) %&gt;%
   mutate(window = cut(t, breaks = c(0, 0.5, 1), include.lowest = T)) %&gt;%
   group_by(iter, id, visit, window) %&gt;%
-  summarize(auc_J1 = performance(prediction(eta_pred_J1, Y),
+  summarize(auc_J1 = performance(prediction(pred50, Y),
                                measure = &quot;auc&quot;)@y.values[[1]],
-            auc_J2 = performance(prediction(eta_pred_J2, Y),
-                               measure = &quot;auc&quot;)@y.values[[1]],
-            auc_J3 = performance(prediction(eta_pred_J3, Y),
-                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;% 
+            auc_J2 = performance(prediction(pred150, Y),
+                               measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
   group_by(visit, window) %&gt;%
   summarise_at(vars(starts_with(&quot;auc_&quot;)), mean)
 
+auc_fGFPCA$auc_J1[1] &lt;- NA
+auc_fGFPCA$auc_J2[1:3] &lt;- NA</code></pre>
+<pre class="r"><code>auc &lt;- inner_join(auc_gmFPCA, auc_fGFPCA, by = c(&quot;visit&quot;, &quot;window&quot;))
 
-auc_glmmad &lt;- auc_glmmad %&gt;% filter(window == &quot;(0.5,1]&quot;)
-auc_glmmad$auc_J2[1] &lt;- NA
-auc_glmmad$auc_J3[1:2] &lt;- NA
-colnames(auc_glmmad) &lt;- c(&quot;visit&quot;, &quot;Time&quot;,
-                          &quot;0 full visit&quot;, &quot;1 full visit&quot;,
-                          &quot;2 full visit&quot;)</code></pre>
-<pre class="r"><code>auc_gmfpca %&gt;% 
-  add_column(auc_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;%
-  kable(digits = 3) %&gt;% 
+colnames(auc) &lt;- c(&quot;Series&quot;, &quot;Prediction window&quot;,
+                          &quot;Half series&quot;, &quot;One and a half series&quot;,
+                          &quot;Half series&quot;, &quot;One and a half series&quot;)
+
+auc %&gt;% kable(digits = 2) %&gt;% 
   kable_styling(full_width = F) %&gt;%
-  add_header_above(c(&quot; &quot; = 2, 
-                     &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
-  add_header_above(c(&quot;Prediction window&quot; = 2,
-                         &quot;Observed window&quot; = 6)) </code></pre>
+  add_header_above(c(&quot; &quot; = 2, &quot;gmFPCA&quot; = 2, &quot;fGFPCA&quot; = 2)) </code></pre>
 <table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
 <thead>
-<tr>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-Prediction window
-</div>
-</th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="6">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-Observed window
-</div>
-</th>
-</tr>
 <tr>
 <th style="empty-cells: hide;border-bottom:hidden;" colspan="2">
 </th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
 <div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
 gmFPCA
 </div>
 </th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
+<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="2">
 <div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-GLMMadaptive
+fGFPCA
 </div>
 </th>
 </tr>
 <tr>
 <th style="text-align:left;">
-visit
+Series
 </th>
 <th style="text-align:left;">
-Time
+Prediction window
 </th>
 <th style="text-align:right;">
-0 full visit
+Half series
 </th>
 <th style="text-align:right;">
-1 full visit
+One and a half series
 </th>
 <th style="text-align:right;">
-2 full visit
+Half series
 </th>
 <th style="text-align:right;">
-0 full visit
-</th>
-<th style="text-align:right;">
-1 full visit
-</th>
-<th style="text-align:right;">
-2 full visit
+One and a half series
 </th>
 </tr>
 </thead>
@@ -682,17 +616,11 @@ Time
 1
 </td>
 <td style="text-align:left;">
-(0.5,1]
-</td>
-<td style="text-align:right;">
-0.705
+[0,0.5]
 </td>
 <td style="text-align:right;">
 </td>
 <td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-0.534
 </td>
 <td style="text-align:right;">
 </td>
@@ -701,264 +629,58 @@ Time
 </tr>
 <tr>
 <td style="text-align:left;">
-2
-</td>
-<td style="text-align:left;">
-(0.5,1]
-</td>
-<td style="text-align:right;">
-0.705
-</td>
-<td style="text-align:right;">
-0.750
-</td>
-<td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-0.537
-</td>
-<td style="text-align:right;">
-0.537
-</td>
-<td style="text-align:right;">
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-3
-</td>
-<td style="text-align:left;">
-(0.5,1]
-</td>
-<td style="text-align:right;">
-0.705
-</td>
-<td style="text-align:right;">
-0.749
-</td>
-<td style="text-align:right;">
-0.756
-</td>
-<td style="text-align:right;">
-0.533
-</td>
-<td style="text-align:right;">
-0.533
-</td>
-<td style="text-align:right;">
-0.533
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div id="joint-table" class="section level3">
-<h3>Joint table</h3>
-<pre class="r"><code>ise &lt;- ise_gmfpca[,3:5] %&gt;% 
-  add_column(ise_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;% 
-  as.matrix()
-
-auc &lt;- auc_gmfpca[, 3:5] %&gt;% 
-  add_column(auc_glmmad[,3:5], .name_repair = &quot;minimal&quot;) %&gt;% 
-  as.matrix()
-
-df_perf &lt;- rbind(ise, auc) %&gt;% data.frame() %&gt;%
-  mutate(visit = rep(1:3, 2), .before =1)
-colnames(df_perf) &lt;- c(&quot;visit&quot;,
-                  rep(c(&quot;No full visit&quot;, 
-                        &quot;1 full visit&quot;, 
-                        &quot;2 full visit&quot;), 2))
-
-df_perf %&gt;%
-  kable(digits = 2) %&gt;%
-  kable_styling(full_width = F) %&gt;%
-  add_header_above(c(&quot; &quot; = 1, &quot;gmFPCA&quot; = 3, &quot;GLMMadaptive&quot; = 3)) %&gt;%
-  add_header_above(c(&quot; &quot; = 1, &quot;Observed data&quot; = 6)) %&gt;%
-  group_rows(index = c(&quot;ISE&quot; = 3, &quot;AUC&quot; = 3))</code></pre>
-<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="empty-cells: hide;border-bottom:hidden;" colspan="1">
-</th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="6">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-Observed data
-</div>
-</th>
-</tr>
-<tr>
-<th style="empty-cells: hide;border-bottom:hidden;" colspan="1">
-</th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-gmFPCA
-</div>
-</th>
-<th style="border-bottom:hidden;padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3">
-<div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
-GLMMadaptive
-</div>
-</th>
-</tr>
-<tr>
-<th style="text-align:right;">
-visit
-</th>
-<th style="text-align:right;">
-No full visit
-</th>
-<th style="text-align:right;">
-1 full visit
-</th>
-<th style="text-align:right;">
-2 full visit
-</th>
-<th style="text-align:right;">
-No full visit
-</th>
-<th style="text-align:right;">
-1 full visit
-</th>
-<th style="text-align:right;">
-2 full visit
-</th>
-</tr>
-</thead>
-<tbody>
-<tr grouplength="3">
-<td colspan="7" style="border-bottom: 1px solid;">
-<strong>ISE</strong>
-</td>
-</tr>
-<tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
 1
 </td>
+<td style="text-align:left;">
+(0.5,1]
+</td>
 <td style="text-align:right;">
-163.94
+0.67
 </td>
 <td style="text-align:right;">
 </td>
 <td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-343.28
-</td>
-<td style="text-align:right;">
+0.62
 </td>
 <td style="text-align:right;">
 </td>
 </tr>
 <tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+<td style="text-align:left;">
 2
 </td>
-<td style="text-align:right;">
-164.23
+<td style="text-align:left;">
+[0,0.5]
 </td>
 <td style="text-align:right;">
-107.93
+0.64
 </td>
 <td style="text-align:right;">
 </td>
 <td style="text-align:right;">
-340.96
-</td>
-<td style="text-align:right;">
-340.96
+0.59
 </td>
 <td style="text-align:right;">
 </td>
 </tr>
 <tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
-3
-</td>
-<td style="text-align:right;">
-165.96
-</td>
-<td style="text-align:right;">
-109.51
-</td>
-<td style="text-align:right;">
-98.75
-</td>
-<td style="text-align:right;">
-345.81
-</td>
-<td style="text-align:right;">
-345.81
-</td>
-<td style="text-align:right;">
-345.81
-</td>
-</tr>
-<tr grouplength="3">
-<td colspan="7" style="border-bottom: 1px solid;">
-<strong>AUC</strong>
-</td>
-</tr>
-<tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
-1
-</td>
-<td style="text-align:right;">
-0.71
-</td>
-<td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-0.53
-</td>
-<td style="text-align:right;">
-</td>
-<td style="text-align:right;">
-</td>
-</tr>
-<tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
+<td style="text-align:left;">
 2
 </td>
-<td style="text-align:right;">
-0.70
+<td style="text-align:left;">
+(0.5,1]
 </td>
 <td style="text-align:right;">
-0.75
+0.57
 </td>
 <td style="text-align:right;">
+0.74
 </td>
 <td style="text-align:right;">
 0.54
 </td>
 <td style="text-align:right;">
-0.54
-</td>
-<td style="text-align:right;">
-</td>
-</tr>
-<tr>
-<td style="text-align:right;padding-left: 2em;" indentlevel="1">
-3
-</td>
-<td style="text-align:right;">
-0.71
-</td>
-<td style="text-align:right;">
-0.75
-</td>
-<td style="text-align:right;">
-0.76
-</td>
-<td style="text-align:right;">
-0.53
-</td>
-<td style="text-align:right;">
-0.53
-</td>
-<td style="text-align:right;">
-0.53
+0.59
 </td>
 </tr>
 </tbody>
@@ -966,195 +688,128 @@ No full visit
 </div>
 </div>
 </div>
-<div id="simulation-compute-missing-values" class="section level1">
-<h1>Simulation: compute missing values</h1>
+<div id="some-thoughts" class="section level1">
+<h1>Some thoughts</h1>
 <ul>
-<li>No need to data splitting. This can be done in all in-sample
-context. I can just use the score from mfpca.face model to compute
-missing value.</li>
-<li>100 subjects in total. 10% percent subject, each with 50%
-missing.</li>
-<li>For GLMM adaptive, I was able to fit a linear model with id_visit
-grouping (not nested). The <em>predict.MixMod</em> function couldn’t
-make subject-series specific prediction. I had to extract random
-coefficients and calculate the prediction by hand.</li>
-<li>Also, GLMM adaptive failed one dataset (43th) due to numeric
-problem.</li>
+<li><p>I think single-level fGFPCA is clearly a better option of
+reference method, because GLMMadaptive is clearly not fitting the right
+model, and other methods clearly cannot do out-of-sample prediction
+without model refitting.</p></li>
+<li><p>If we really need to incorporate GLMM, I think it might be better
+to compare in-sample prediction. In that case at least we know the model
+has the “correct” grouping structure.</p></li>
+<li><p>For the second case (missing value), what we would be doing is
+essentially point2</p></li>
 </ul>
-<pre class="r"><code>load(here(&quot;Data/SimOutput/SimOutput_miss.RData&quot;))
-load(here(&quot;Data/SimOutput/SimOutput_miss_ref.RData&quot;))</code></pre>
-<div id="figure-1" class="section level2">
-<h2>Figure</h2>
-<pre class="r"><code>cols &lt;- c(&quot;#66C2A5&quot;, &quot;#000000&quot;) # define a color palette 
-names(cols) &lt;- c(&quot;Computed&quot;, &quot;Observed/True&quot;)</code></pre>
-<pre class="r"><code>rand_id &lt;- sample(unique(comp_list_allM_ref[[1]]$id), 2)
-
-p1 &lt;- comp_list_allM[[1]] %&gt;%
-  filter(id %in% rand_id) %&gt;%
-  rename(series = visit) %&gt;%
-  mutate_at(vars(starts_with(&quot;eta&quot;)), 
-            function(x)(exp(x)/(1+exp(x)))) %&gt;%
-  mutate(eta=ifelse(is.na(Yobs), NA, eta),
-         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %&gt;% 
-  ggplot()+
-  geom_point(aes(x=t, y=eta, col=&quot;Observed/True&quot;), size = 0.1, na.rm = T)+
-  geom_point(aes(x=t, y=eta_comp, col=&quot;Computed&quot;), size = 0.1, 
-             na.rm = T)+
-  geom_point(aes(x=t, y=Yobs, col = &quot;Observed/True&quot;), size = 0.1,
-             na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(series))+
-  scale_color_manual(values = cols)+
-  labs(title = &quot;gmFPCA&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
-
-p2 &lt;- comp_list_allM_ref[[1]] %&gt;%
-  filter(id %in% rand_id) %&gt;% 
-  rename(series = visit) %&gt;%
-  mutate_at(vars(starts_with(&quot;eta&quot;)), 
-            function(x)(exp(x)/(1+exp(x)))) %&gt;%
-  mutate(eta=ifelse(is.na(Yobs), NA, eta),
-         eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %&gt;% 
-  ggplot()+
-  geom_point(aes(x=t, y=eta, col=&quot;Observed/True&quot;), size = 0.1, na.rm = T)+
-  geom_point(aes(x=t, y=eta_comp, col=&quot;Computed&quot;), size = 0.1, 
-             na.rm = T)+
-  geom_point(aes(x=t, y=Yobs, col=&quot;Observed/True&quot;), size = 0.1,
-             na.rm = T)+
-  facet_grid(rows = vars(id), cols = vars(series))+
-  scale_color_manual(values=cols)+
-  labs(title = &quot;GLMMadaptive&quot;, colour=&quot;&quot;, y=&quot;&quot;, x=&quot;t&quot;)
-
-ggarrange(p1, p2, nrow = 1, common.legend = T, legend = &quot;bottom&quot;)</code></pre>
-<p><img src="Simulation_files/figure-html/miss_sim-1.png" width="1152" /></p>
-</div>
-<div id="computation-time-1" class="section level2">
-<h2>Computation time</h2>
-<pre class="r"><code># print(&quot;Computation time:&quot;)
-data.frame(&quot;gmFPCA&quot; = mean(comp_time_vec),
-           &quot;GLMMadaptive&quot; = mean(comp_time_vec_ref, na.rm=T)) %&gt;% 
-  mutate(&quot; &quot; = &quot;Time (minutes)&quot;, .before=1) %&gt;%
-  kable(digits = 2) %&gt;% 
-  kable_styling(full_width = F)</code></pre>
-<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:left;">
-</th>
-<th style="text-align:right;">
-gmFPCA
-</th>
-<th style="text-align:right;">
-GLMMadaptive
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-Time (minutes)
-</td>
-<td style="text-align:right;">
-0.39
-</td>
-<td style="text-align:right;">
-0.84
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div id="integrated-squared-error" class="section level2">
-<h2>Integrated squared error</h2>
-<ul>
-<li>Average acros all single values</li>
-</ul>
-<pre class="r"><code>ise_gmfpca2 &lt;- bind_rows(comp_list_allM, .id = &quot;iter&quot;) %&gt;% 
-  filter(is.na(Yobs)) %&gt;%
-  mutate(error = (eta_comp-eta)^2) %&gt;%
-  group_by(iter, id) %&gt;% 
-  summarize(error = sum(error)) %&gt;%
-  ungroup() %&gt;%
-  summarise(error = mean(error))
-
-ise_glmmad2 &lt;- bind_rows(comp_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
-  filter(is.na(Yobs)) %&gt;%
-  mutate(error = (eta_comp-eta)^2) %&gt;%
-  group_by(iter, id) %&gt;% 
-  summarize(error = sum(error)) %&gt;%
-  ungroup() %&gt;%
-  summarise(error = mean(error))</code></pre>
-<pre class="r"><code># print(&quot;Integrated squared error:&quot;)
-data.frame(&quot;gmFPCA&quot; = ise_gmfpca2[1, 1], 
-           &quot;GLMMadaptive&quot;= ise_glmmad2[1, 1]) %&gt;%
-  kable(digits = 2) %&gt;% 
-  kable_styling(full_width = F)</code></pre>
-<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:right;">
-error
-</th>
-<th style="text-align:right;">
-error.1
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:right;">
-307.24
-</td>
-<td style="text-align:right;">
-948.79
-</td>
-</tr>
-</tbody>
-</table>
-<p>In fact the missing data scenario appears a better illustration.</p>
-</div>
-<div id="auc-1" class="section level2">
-<h2>AUC</h2>
-<pre class="r"><code>auc_gmfpca2 &lt;- bind_rows(comp_list_allM, .id = &quot;iter&quot;) %&gt;% 
-  filter(is.na(Yobs)) %&gt;%
-  group_by(iter, id) %&gt;% 
-  summarise(auc = performance(prediction(eta_comp, Y),
-                              measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
-  ungroup() %&gt;%
-  summarise(auc = mean(auc))
-
-auc_glmmad2 &lt;- bind_rows(comp_list_allM_ref, .id = &quot;iter&quot;) %&gt;% 
-  filter(is.na(Yobs)) %&gt;%
-  group_by(iter, id) %&gt;% 
-  summarise(auc = performance(prediction(eta_comp, Y),
-                              measure = &quot;auc&quot;)@y.values[[1]]) %&gt;%
-  ungroup() %&gt;%
-  summarise(auc = mean(auc))</code></pre>
-<pre class="r"><code>data.frame(&quot;gmFPCA&quot; = auc_gmfpca2[1, 1], 
-           &quot;GLMMadaptive&quot;= auc_glmmad2[1, 1]) %&gt;%
-  kable(digits = 2) %&gt;% 
-  kable_styling(full_width = F)</code></pre>
-<table class="table" style="color: black; width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:right;">
-auc
-</th>
-<th style="text-align:right;">
-auc.1
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:right;">
-0.82
-</td>
-<td style="text-align:right;">
-0.63
-</td>
-</tr>
-</tbody>
-</table>
-</div>
+<!-- # Simulation: compute missing values -->
+<!-- - No need to data splitting. This can be done in all in-sample context. -->
+<!-- I can just use the score from mfpca.face model to compute missing value. -->
+<!-- - 100 subjects in total. 10% percent subject, each with 50% missing. -->
+<!-- - For GLMM adaptive, I was able to fit a linear model with id_visit grouping (not nested). The *predict.MixMod* function couldn't make subject-series specific prediction. I had to extract random coefficients and calculate the prediction by hand. -->
+<!-- - Also, GLMM adaptive failed one dataset (43th) due to numeric problem. -->
+<!-- ```{r load_mis_output} -->
+<!-- load(here("Data/SimOutput/SimOutput_miss.RData")) -->
+<!-- load(here("Data/SimOutput/SimOutput_miss_ref.RData")) -->
+<!-- ``` -->
+<!-- ## Figure -->
+<!-- ```{r color_setting2} -->
+<!-- cols <- c("#66C2A5", "#000000") # define a color palette  -->
+<!-- names(cols) <- c("Computed", "Observed/True") -->
+<!-- ``` -->
+<!-- ```{r miss_sim, fig.width=12, fig.height=4} -->
+<!-- rand_id <- sample(unique(comp_list_allM_ref[[1]]$id), 2) -->
+<!-- p1 <- comp_list_allM[[1]] %>% -->
+<!--   filter(id %in% rand_id) %>% -->
+<!--   rename(series = visit) %>% -->
+<!--   mutate_at(vars(starts_with("eta")),  -->
+<!--             function(x)(exp(x)/(1+exp(x)))) %>% -->
+<!--   mutate(eta=ifelse(is.na(Yobs), NA, eta), -->
+<!--          eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>%  -->
+<!--   ggplot()+ -->
+<!--   geom_point(aes(x=t, y=eta, col="Observed/True"), size = 0.1, na.rm = T)+ -->
+<!--   geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1,  -->
+<!--              na.rm = T)+ -->
+<!--   geom_point(aes(x=t, y=Yobs, col = "Observed/True"), size = 0.1, -->
+<!--              na.rm = T)+ -->
+<!--   facet_grid(rows = vars(id), cols = vars(series))+ -->
+<!--   scale_color_manual(values = cols)+ -->
+<!--   labs(title = "gmFPCA", colour="", y="", x="t") -->
+<!-- p2 <- comp_list_allM_ref[[1]] %>% -->
+<!--   filter(id %in% rand_id) %>%  -->
+<!--   rename(series = visit) %>% -->
+<!--   mutate_at(vars(starts_with("eta")),  -->
+<!--             function(x)(exp(x)/(1+exp(x)))) %>% -->
+<!--   mutate(eta=ifelse(is.na(Yobs), NA, eta), -->
+<!--          eta_comp=ifelse(is.na(Yobs), eta_comp, NA)) %>%  -->
+<!--   ggplot()+ -->
+<!--   geom_point(aes(x=t, y=eta, col="Observed/True"), size = 0.1, na.rm = T)+ -->
+<!--   geom_point(aes(x=t, y=eta_comp, col="Computed"), size = 0.1,  -->
+<!--              na.rm = T)+ -->
+<!--   geom_point(aes(x=t, y=Yobs, col="Observed/True"), size = 0.1, -->
+<!--              na.rm = T)+ -->
+<!--   facet_grid(rows = vars(id), cols = vars(series))+ -->
+<!--   scale_color_manual(values=cols)+ -->
+<!--   labs(title = "GLMMadaptive", colour="", y="", x="t") -->
+<!-- ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "bottom") -->
+<!-- ``` -->
+<!-- ## Computation time -->
+<!-- ```{r} -->
+<!-- # print("Computation time:") -->
+<!-- data.frame("gmFPCA" = mean(comp_time_vec), -->
+<!--            "GLMMadaptive" = mean(comp_time_vec_ref, na.rm=T)) %>%  -->
+<!--   mutate(" " = "Time (minutes)", .before=1) %>% -->
+<!--   kable(digits = 2) %>%  -->
+<!--   kable_styling(full_width = F) -->
+<!-- ``` -->
+<!-- ## Integrated squared error -->
+<!-- - Average acros all single values -->
+<!-- ```{r, message=FALSE} -->
+<!-- ise_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>%  -->
+<!--   filter(is.na(Yobs)) %>% -->
+<!--   mutate(error = (eta_comp-eta)^2) %>% -->
+<!--   group_by(iter, id) %>%  -->
+<!--   summarize(error = sum(error)) %>% -->
+<!--   ungroup() %>% -->
+<!--   summarise(error = mean(error)) -->
+<!-- ise_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>%  -->
+<!--   filter(is.na(Yobs)) %>% -->
+<!--   mutate(error = (eta_comp-eta)^2) %>% -->
+<!--   group_by(iter, id) %>%  -->
+<!--   summarize(error = sum(error)) %>% -->
+<!--   ungroup() %>% -->
+<!--   summarise(error = mean(error)) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- # print("Integrated squared error:") -->
+<!-- data.frame("gmFPCA" = ise_gmfpca2[1, 1],  -->
+<!--            "GLMMadaptive"= ise_glmmad2[1, 1]) %>% -->
+<!--   kable(digits = 2) %>%  -->
+<!--   kable_styling(full_width = F) -->
+<!-- ``` -->
+<!-- In fact the missing data scenario appears a better illustration.  -->
+<!-- ## AUC -->
+<!-- ```{r, message=FALSE} -->
+<!-- auc_gmfpca2 <- bind_rows(comp_list_allM, .id = "iter") %>%  -->
+<!--   filter(is.na(Yobs)) %>% -->
+<!--   group_by(iter, id) %>%  -->
+<!--   summarise(auc = performance(prediction(eta_comp, Y), -->
+<!--                               measure = "auc")@y.values[[1]]) %>% -->
+<!--   ungroup() %>% -->
+<!--   summarise(auc = mean(auc)) -->
+<!-- auc_glmmad2 <- bind_rows(comp_list_allM_ref, .id = "iter") %>%  -->
+<!--   filter(is.na(Yobs)) %>% -->
+<!--   group_by(iter, id) %>%  -->
+<!--   summarise(auc = performance(prediction(eta_comp, Y), -->
+<!--                               measure = "auc")@y.values[[1]]) %>% -->
+<!--   ungroup() %>% -->
+<!--   summarise(auc = mean(auc)) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- data.frame("gmFPCA" = auc_gmfpca2[1, 1],  -->
+<!--            "GLMMadaptive"= auc_glmmad2[1, 1]) %>% -->
+<!--   kable(digits = 2) %>%  -->
+<!--   kable_styling(full_width = F) -->
+<!-- ``` -->
 </div>
 
 
