@@ -25,7 +25,8 @@ set.seed(120)
 
 #### gmFPCA ####
 
-load(here("Data/SimData/SimData.RData")) # data generated from Code/GenData.R
+# load(here("Data/SimData/SimData.RData")) # data generated from Code/GenData.R
+load(here("Data/SimData/SimDataJ3.RData"))
 
 N <- length(unique(data_list[[1]]$id))
 K <- length(unique(data_list[[1]]$t))
@@ -37,13 +38,10 @@ M <- length(data_list)
 # training and testing sample size
 Ntr <- Nte <- 100
 
-# load(here("Data/SimData.RData"))
-
-# load(here("Data/SimData/SimData_J200.RData"))
 
 tmax <- 0.5 # max time of observation
 
-M <- 3
+# M <- 3 # try with a few datasets first
 
 fit_time_vec <- rep(NA, M)
 pred_time_vec <- rep(NA, M)

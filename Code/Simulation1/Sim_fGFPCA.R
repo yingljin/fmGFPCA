@@ -27,7 +27,8 @@ theme_set(theme_minimal())
 
 #### load simulated data ####
 
-load(here("Data/SimData/SimData.RData")) # data generated from Code/GenData.R
+# load(here("Data/SimData/SimData.RData")) # data generated from Code/GenData.R
+load(here("Data/SimData/SimDataJ3.RData")) 
 
 N <- length(unique(data_list[[1]]$id))
 J <- length(unique(data_list[[1]]$t))*length(unique(data_list[[1]]$visit))
@@ -64,7 +65,7 @@ knots_values <- seq(-p, knots + p, length = knots + 1 + 2 *p)/knots
 knots_values <- knots_values * (max(mid) - min(mid)) + min(mid)
 
 # result container
-M <- 3 # try on a few datasets first
+# M <- 3 # try on a few datasets first
 
 # M
 pred_list_fGFPCA <- list()
@@ -217,21 +218,17 @@ close(pb)
 #### Check output ####
 
 # time 
+
 mean(time_fGFPCA)
 
 # prediction
 # figure
 rand_id <- sample(test_id, 4)
 
-df_exp <- pred_list_fGFPCA[[1]] %>% 
+pred_list_fGFPCA[[1]] %>% 
   filter(id == 101) %>%
   mutate_at(vars(starts_with("pred")), 
-            function(x){exp(x)/(1+exp(x))})  
-df_exp[df_exp$sind<=50, "pred50"] <- NA
-df_exp[df_exp$sind<=150, "pred150"] <- NA
-
-
-df_exp %>%
+            function(x){exp(x)/(1+exp(x))}) %>%
   ggplot()+
   geom_point(aes(x=t, y=Y), size = 0.2)+
   geom_line(aes(x=t, y=probs, col = "True"))+

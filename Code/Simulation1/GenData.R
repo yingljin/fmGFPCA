@@ -30,7 +30,9 @@ M  <- 100
 Ntr <- 100
 Nte <- 100
 
-J <- 2 # total number of visits
+# J <- 2 # total number of visits
+J <- 3 # total number of visits
+
 K <- 200
 
 #### Generate data ####
@@ -68,4 +70,4 @@ data_list[[1]] %>% filter(id %in% sample(1:200, 2)) %>%
   facet_grid(row = vars(id), col=vars(visit))
 
 save(data_list,
-     file = here("Data/SimData/SimData.RData")) # data that will be used for all of simulation
+     file = here("Data/SimData/SimDataJ3.RData")) # data that will be used for all of simulation
